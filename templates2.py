@@ -9,7 +9,6 @@ from sys import argv, exit
 
 from templates import sidereal as sd
 import paths
-import bases
 
 ## SOURCE
 

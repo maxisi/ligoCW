@@ -45,7 +45,7 @@ ap = 'files/templates/antennapatterns/'         # antenna patterns
 # Data
 rhB = 'files/background/'                       # background heterodynes
 originalData = 'files/remote/source' # '../../matthew/analyses/S6_all/results'
-importedData = 'files/data/dataPitkin_'         # original data in DataFrame
+importedData = 'files/data/finehet_'         # original data in DataFrame
 
 # Detector
 vectors = 'files/templates/vectors/'            # detector and wave vectors
