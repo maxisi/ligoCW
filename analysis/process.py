@@ -11,21 +11,48 @@ from templates2 import detnames
 import paths
 
 
+def het(vector, f, *arg):
+    '''
+    Heterodynes vector at frequencies f. Preferred input for vector is series indexed
+    over time; f can be a list or an array. Returns DataFrame.
+    '''
+    print 'Ready to heterodyne.',
+    
+    if len(arg)==0:
+        try:
+            t = vector.index.tolist()
+        except AttributeError:
+            print 'ERROR: no time vector for heterodyne.'
+            exit(0)
+            
+    elif len(arg)==1:
+        t = arg[0]
+        
+    else:
+        print 'ERROR: het needs input time or indexed vector, not %d extra arguments.' % len(arg)
+        exit(0)
+    
+    temp = np.exp(2*np.pi*1j*np.multiply.outer(f, t))
+    print 'Template created.'
+    
+    try:
+        template = pd.DataFrame(temp, index=['f' + str(x) for x in range(0,len(f))], columns=t)
+    except ValueError:
+        template = pd.Series(temp, index=t)
+    
+    rh = vector*template
+    return rh.T
+
 class Data(object):
 
-    def __init__(self, detector, psr, finj):
+    def __init__(self, detector, psr):
         self.detector = detector
         self.det = detnames(detector)
         self.psr = psr
-        self.finj = finj
-        
-        # background info
-        self.backdir = paths.rhB + self.det + '/' + self.psr + '/'
-        self.backname = 'back_' + self.psr + '_' + self.det
         
         # data info
         self.datadir = paths.importedData + self.psr + '_' + self.detector + '.hdf5'
-        self.finehet = 'finehet_' + self.psr + '_' + self.detector
+        self.seedname = 'finehet_' + self.psr + '_' + self.detector
 
 
     def imp(self):
@@ -33,7 +60,7 @@ class Data(object):
         Return DF with original data (col: PSR; index: t). Assuming execution on ATLAS.
         '''
         
-        struct = '/data' + self.detector + '/' + self.finehet
+        struct = '/data' + self.detector + '/' + self.seedname
         pathOptions = [
                      paths.originalData + struct,
                      paths.originalData + '/' + self.psr + '_' + self.detector + struct
@@ -76,8 +103,8 @@ class Data(object):
                     print 'Exiting at analysis/process ln 77'
                     exit()
 
-            dWhole = dParts['Re']+dParts['Im']*1j
-            d[self.psr] = dWhole
+            self.finehet = dParts['Re']+dParts['Im']*1j
+            d[self.psr] = self.finehet
             
         finally:
             d.close()
@@ -89,84 +116,63 @@ class Data(object):
         Imports data from M.Pitkin if necessary.
         '''
         
-        print 'Getting %(detector)s original heterodyned %(detector)s data.' % locals()
-
         try:
-            d = pd.HDFStore(self.datadir)
+            d = pd.HDFStore(self.datadir, 'r')
         
-            if self.psrlist not in [s.strip('/') for s in d.keys()]:
-                print 'PSR not present in file.',
-    #             print 'PSR list: %r' % psrlist
-    #             print 'File list: %r' % [s.strip('/') for s in d.keys()]
-                print 'Refreshing...',
-                d.close()
-                imp(detector)
-                d = pd.HDFStore(paths.importedData + detector + '.hdf5')
-            
-                if psr == None:
-                    print 'Success.'
-                    return d
-                else:
-                    dpsr = d[psr]
-                    d.close()
-                    print 'Success.'
-                    return dpsr
-            else:
-                print 'File is ready to go.',
-            
-                if psr == None:
-                    print 'Success.'
-                    return d
-                else:
-                    dpsr = d[psr]
-                    d.close()
-                    print 'Success.'
-                    return dpsr
+            try:
+                self.finehet = d[self.psr]
+            except KeyError:
+                # file is empty or is corrupted
+                self.imp(detector)
+        
+        except IOError:
+            self.imp()
+        
+        finally:
+            d.close()
                 
-        except KeyError:
-            print 'No record for %(detector)s found. Importing it from M.Pitkin...' % locals(),
+
+class Background(object):
+    def __init__(self, detector, psr, freq, filesize=100):
+        # data
+        self.seed = Data(detector, psr)
+        self.seed.get()
+        
+        # background info
+        self.freq = freq
+        self.filesize = filesize      # number of series per file. Adjust!
+        
+        self.nsets = int(len(freq)/filesize)
+        if self.nsets<1:
+            self.nsets = 1
+            
+        self.fset = {n : freq[n*filesize:min(len(freq),(n+1)*filesize)] for n in range(self.nsets)}
+        
+        # storing info
+        self.backdir = paths.rhB + self.seed.det + '/' + psr + '/'
+        self.backname = 'back_' + psr + '_' + self.seed.det + '_'
     
-            imp(detector)
-            d = pd.HDFStore(paths.importedData + detector + '.hdf5')
-            if psr == None:
-                print 'Success.'
-                return d
-            else:
-                dpsr = d[psr]
-                d.close()
-                print 'Success.'
-                return dpsr
-                
-                
-    def background(self, data):
+             
+    def create(self):
         '''
         Re heterodynes and saves data at frequencies f. Number of heterodynes is determined by
         f and data can be for more than one pulsar
         '''
-        nsets = int(len(freq)/threshold)
-        print '\tWill create background in %(nsets)d files of 1e4 instantiations each.' % locals()
-
-        if nsets<1:
-            nsets = 1
-        else:
-            pass
-    
-        fset = {n : freq[n*threshold:min(len(freq),(n+1)*threshold)] for n in range(0, nsets)}
-        path = [self.backpath + str(n) for n in range(0, nsets)]
-
-        for n in range(0, nsets):
-            
-            rh = pd.HDFStore(path[n], 'w')
         
+        # create background directory
+        try:
+            os.makedirs(self.backdir)
+        except OSError:
+            pass
+
+        for n in range(self.nsets):
+            path = self.backdir + self.backname + str(n)
+            
             try:
-                for psr in [s.strip('/') for s in data.keys()]:
-                    print psr
-                    rh[psr] = het(data[psr], fset[n])
-                
-            except AttributeError:
-                print "Atribute Error in data.background"
-                rh[data.name] = het(data, fset[n])
-            rh.close()    
+                rh = pd.HDFStore(path, 'w')
+                rh[self.seed.psr] = het(self.seed.finehet, self.fset[n])
+            finally:
+                rh.close()    
 
 
 class InjSearch(object):
@@ -183,13 +189,8 @@ class InjSearch(object):
         self.hinj = np.linspace(hinjrange[0], hinjrange[1], ninj)
         self.injkind = injkind  
         
-        # background path info
-        self.backdir = path.rhB + self.det + '/' + self.psr + '/'
-
-        
         print hinjrange
         
-    
     
     def checkfiles(self):
         '''
