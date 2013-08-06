@@ -56,7 +56,7 @@ def background(data, freq, det):
         pass
     
     fset = {n : freq[n*threshold:min(len(freq),(n+1)*threshold)] for n in range(0, nsets)}
-    path = [paths.rhB + det + str(n) for n in range(0, nsets)]
+    path = [paths.rhB + 'back_' +  det + str(n) for n in range(0, nsets)]
 
     for n in range(0, nsets):
         rh = pd.HDFStore(path[n])

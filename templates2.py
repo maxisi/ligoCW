@@ -10,6 +10,7 @@ from sys import argv, exit
 from templates import sidereal as sd
 import paths
 
+
 ## SOURCE
 
 paramNames = ['#', None, 'RAS', 'RAS error', 'DEC', 'DEC error']
@@ -329,6 +330,12 @@ class Detector(object):
             
 
 ## ANTENNA PATTERNS
+class System(object):
+    def __init__(self, detector, psr):
+        self.detector = detector
+        self.det = detnames(detector)
+        self.psr = psr
+
 
 bases_names = ['pl', 'cr', 'xz', 'yz', 'br']
 

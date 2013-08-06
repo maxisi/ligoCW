@@ -1,13 +1,14 @@
 from sys import exit
 import matplotlib.pyplot as plt
 import os
+import datetime
 
 import numpy as np
 import pandas as pd
 
 # from analysis import search
 # from templates import simulate
-from templates2 import detnames
+from templates2 import detnames, System
 import paths
 
 
@@ -42,7 +43,7 @@ def het(vector, f, *arg):
     
     rh = vector*template
     return rh.T
-    
+
 
 class Data(object):
 
@@ -165,7 +166,8 @@ class Background(object):
             os.makedirs(self.backdir)
         except OSError:
             pass
-
+            
+        # create background files
         for n in range(self.nsets):
             path = self.backdir + self.backname + str(n)
             
@@ -173,18 +175,55 @@ class Background(object):
                 rh = pd.HDFStore(path, 'w')
                 rh[self.seed.psr] = het(self.seed.finehet, self.fset[n])
             finally:
-                rh.close()    
+                rh.close()
+        
+        # create log
+        now = datetime.datetime.now()
+        comments = '# ' + self.seed.detector + '\n# ' + self.seed.psr + '\n# ' + str(now) + '\n'
+        fileinfo = 'nsets\tfilesize\n' + str(self.nsets) + '\t' + str(self.filesize)
+        try:
+            f = open(self.backdir + 'log.txt', 'w')
+            f.write(comments + fileinfo)
+        finally:
+            f.close()
+
+    def get(self):
+        '''
+        Checks background required for search exits and creates it if needed.
+        Returns filename list.
+        '''
+        # read log
+        try:
+            readme = pd.read_table(self.backdir + 'log.txt', sep='\s+', skiprows=3)
+            log_nfiles = readme['nsets'].ix[0]
+            log_filesize = readme['filesize'].ix[0]
+            log_nfreq = log_nfiles * log_filesize
+            
+            # get actual number of background files in directory
+            files = [name for name in os.listdir(self.backdir) if 'back' in name]
+            nfiles = len(files)
+            
+            if nfiles!=log_nfiles or log_nfreq!=len(self.freq):
+                self.create()
+        except IOError:
+            # no log found
+            self.create()
+# 
+#         files = [name for name in os.listdir(paths.rhB) if self.det in name]
+#         
+#         return files
 
 
 class InjSearch(object):
     
-    def __init__(self, detector, psr, nfreq, injkind, ninj, frange=[1.0e-7, 1.0e-5], hinjrange=[1.0E-27, 1.0E-24]):
-        self.detector = detector
-        self.det = detnames(detector)
-        self.psr = psr
+    def __init__(self, detector, psr, nfreq, injkind, ninj, frange=[1.0e-7, 1.0e-5], hinjrange=[1.0E-27, 1.0E-24], filesize=100):
+        
+        self.info = System(detector, psr)
         
         # rehet info
         self.freq = np.linspace(frange[0], frange[1], nfreq)
+        
+        self.background = Background(detector, psr, self.freq, filesize)
         
         # injection info
         self.hinj = np.linspace(hinjrange[0], hinjrange[1], ninj)
@@ -192,53 +231,20 @@ class InjSearch(object):
         
         print hinjrange
         
-    
-    def checkfiles(self):
-        '''
-        Checks background required for search exits and creates it if needed.
-        Returns filename list.
-        '''
-        print 'Checking background files exist...',
-        
-        files = [name for name in os.listdir(paths.rhB) if self.det in name]
-        nfiles = len(files)
-        ninst = nfiles * data.threshold # this might not always be true!
-    
-        if ninst < len(self.freq):
-            print 'not enough files for %s. Generating:' %self.det,
-            print '(1) Get seed data;',
-            d = data.get(self.detector)
-            print '(2) Heterodyne.'
-            data.background(d, self.freq, self.det)
-            print 'Success.'
-            d.close()
-            
-        else:
-            print 'they do.\n'
-            
-        files = [name for name in os.listdir(paths.rhB) if self.det in name]
-        
-        return files
-        
-        
     def analyze(self, methods, injpdif=np.pi/2.):
         '''
         Loads a background file, analyzes it feeding it to search by PSR, saves results 
         by pulsar. Loops over files and returns dictionary with h_rec and sig dataframes
         for each PSR (i.e. there are 2 DFs for each PSR key).
         '''
-        files = self.checkfiles()
-        nfiles = len(files)
-        back_paths = [paths.rhB + filename for filename in files]
-        print 'Analyzing %d files.' % nfiles
+        
+        # background
+        self.background.get()
+        
+        print 'Analyzing %d files.' % self.background.nsets
         
         ## Set up injections
-        nsets = int(len(self.freq)/data.threshold)
-        if nsets<1:
-            nsets = 1
-        else:
-            pass
-        hperfile = int(len(self.hinj)/nsets)
+        self.hperfile = int(len(self.hinj)/self.background.nsets)
         injset = {back_paths[n] : self.hinj[hperfile*n:(n+1)*hperfile] for n in range(0, nsets)}
 
         ## Process first file to get PSR list and initialize storage variables.
