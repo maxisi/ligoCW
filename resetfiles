@@ -13,7 +13,7 @@ c = raw_input('Are you sure you wish to continue? (y/n) ')
 if c == 'y':
     pathlist = [
                 'files/background/',
-		paths.ap,
+	        	paths.ap,
                 paths.textfromATNF,
                 paths.psrcat,
                 paths.sigma
