@@ -42,6 +42,7 @@ def het(vector, f, *arg):
     
     rh = vector*template
     return rh.T
+    
 
 class Data(object):
 
