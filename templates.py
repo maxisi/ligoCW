@@ -416,7 +416,7 @@ class Polarizations(object):
     # scalar
     def breathing(self):
         self.product('br')
-        br = np.sqrt(2)*(self.wxdx**2 - self.wxdy**2 + self.wydx**2 - wydy**2)/2.
+        br = np.sqrt(2)*(self.wxdx**2 - self.wxdy**2 + self.wydx**2 - self.wydy**2)/2.
         return br
         # Added factor of sqrt(2) to distribute power equally among polarizations.
         # Same for longitudinal.
@@ -458,6 +458,9 @@ class Response(object):
         if kinds in bases_tempNames:
             # requesting bases for preset template
             self.kinds = bases_aps[kinds]
+        elif isinstance(kinds, list) and all([k in bases_tempNames for k in kinds]):
+            # list of preset templates
+            self.kinds = sum([bases_aps[temp] for temp in kinds], [])
         elif all([k in bases_names for k in kinds]) and not isinstance(kinds, basestring):
             # requesting bases by name
             self.kinds = kinds
@@ -583,11 +586,12 @@ class Signal(object):
     Can generate a signal. Possible returns: signal (time series), design matrix.
     '''
 
-    def __init__(self, syst, kind, t, override_weights=False):
+    def __init__(self, syst, kind, t, isloaded=False, override_weights=False):
         # system contains source and detector information
         self.syst = syst
         # when the system interacts, it creates antenna patterns
-        self.syst.interact(t, kind)
+        if not isloaded:
+            self.syst.interact(t, kind)
         
         self.kind = kind
         
@@ -632,22 +636,22 @@ class Signal(object):
                 self.weights[p] = 1.
             
 
-    def design_matrix(self, incl=None):
+    def design_matrix(self, iota=None):
     
         # check inclination angle and get weights
         if not self.override_weights:
-            self.getweights(angle=incl)
+            self.getweights(angle=iota)
         
         if self.kind=='Sid':
             th = pd.Series(sd.w * self.t, index=self.t)
             basis = [np.cos(th), np.cos(2.*th), np.sin(th), np.sin(2.*th)]
-            dm = pd.concat(basis, axis=1, keys=components[self.kind][0:4])
-            dm[components[self.kind][4]]=1
+            self.dm = pd.concat(basis, axis=1, keys=components[self.kind][0:4])
+            self.dm[components[self.kind][4]]=1
         else:
             dmDict = {}      
             for pol in self.syst.response.kinds:
                 dmDict[pol] = getattr(self.syst.response, pol) * self.weights[pol]/2.
-            self.dm = pd.DataFrame(dmDict) # DF cols: comp. names, index: t.
+            self.dm = pd.DataFrame(dmDict).dropna(axis=1) # DF cols: comp. names, index: t.
 
             
     def simulate(self, h0, incl=[]):
@@ -660,7 +664,7 @@ class Signal(object):
             print 'Cannot simulate "Sid". Change Signal.kind?'
         else:
             # form design matrix
-            self.design_matrix(incl=incl)
+            self.design_matrix(iota=incl)
             
             # raise phases to exponent (apply),
             # multiply amplitudes and phases (mul),

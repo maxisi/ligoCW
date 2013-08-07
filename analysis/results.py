@@ -15,17 +15,16 @@ reload(psrplot)
 
 class Open(object):
     
-    def __init__(self, detector, injkind, pinj, location=paths.results):
+    def __init__(self, detector, psr, injkind, pinj, location=paths.results):
+        self.psr = psr
         self.detector = detector
         self.injkind = injkind
         self.pinj = pinj
-        self.location = location + self.detector + '/' + self.detector + '_' + self.injkind + '_' + paths.pname(self.pinj) + '_'
+        self.location = location + self.detector + '/' + self.psr '/' + self.psr + '_' + self.detector + '_' + self.injkind + '_' + paths.pname(injpdif)
         
         # load data
-        self.hinj = np.load(self.location + 'hinj.npy')
-
         try:
-            hrec_file = pd.HDFStore(self.location + 'h', 'r')
+            r = pd.HDFStore(self.location + 'h', 'r')
             self.hrec = {psr.strip('/'): hrec_file[psr.strip('/')] for psr in hrec_file.keys()}
         except IOError:
             print 'Cannot find hrec file in %(self.location)s' % locals()
