@@ -502,11 +502,6 @@ class Response(object):
         # Save if requested
         if savefile:
             try:
-                os.makedirs(paths.ap)
-            except OSError:
-                pass
-                
-            try:
                 apF = pd.HDFStore(self.path, 'w')
                 for k in self.kinds:
                     apF[k] = getattr(self, k)
