@@ -252,7 +252,7 @@ class Detector(object):
         self.id = d  
         self.name = detnames(d)
         self.param = detectors[self.name]
-        self.t = np.array([int(x) for x in t])
+        self.t = np.array(t).astype(int)
         self.nentries = len(t)
         self.path = paths.vectors + 'detVec_' + self.name
         
@@ -480,11 +480,11 @@ class Response(object):
         # Retrieve detector vectors
         if not self.hasvectors:
             self.src = Source(self.psr)
-            self.det = Detector(self.det, self.t)
+            self.obs = Detector(self.det, self.t)
             self.hasvectors = True
             
         # Rotate source vectors
-        if psi!=[]:
+        if psi==[]:
             self.psi = self.src.param['POL']
         else:
             self.psi = psi
@@ -493,7 +493,7 @@ class Response(object):
         wyRot = self.src.wx*np.cos(self.psi) + self.src.wy*np.sin(self.psi) 
         
         # Package vectors
-        vecs = Vectors(self.det.dx, self.det.dy, self.src.wx, self.src.wy, self.src.wz)      
+        vecs = Vectors(self.obs.dx, self.obs.dy, self.src.wx, self.src.wy, self.src.wz)      
            
         # Get polarizations
         pols = Polarizations(vecs)
@@ -582,53 +582,66 @@ class System(object):
 
 
 ## SIMULATE            
-            
-class Weights(object):
-
-    def __init__(self, kind, angle=[]):
-        self.kind = kind
-        self.iota = angle
-        # component weights
-        if self.kind == 'GR':
-            self.pl = (1. + np.cos(self.iota)**2)/2.
-            self.cr = np.cos(self.iota)
-            print angle
-                
-        elif self.kind == 'G4v':
-            self.xz = np.sin(self.iota)
-            self.yz = np.sin(self.iota)*np.cos(self.iota)
-    
-        else:
-            [setattr(self, p, 1) for p in bases_aps[kind]]
-
 
 class Signal(object):
     '''
     Can generate a signal. Possible returns: signal (time series), design matrix.
-    If you wish, provide your own antenna patterns setting F = {dict from tm.getAP}
     '''
 
-    def __init__(self, syst, h0, kind, t):
+    def __init__(self, syst, kind, t, override_weights=False):
+        # system contains source and detector information
         self.syst = syst
+        # when the system interacts, it creates antenna patterns
         self.syst.interact(t, kind)
         
-        self.h0 = h0
         self.kind = kind
         
-        self.t = np.array(t)
-
-
-    def design_matrix(self, iota=[]):
-        # Returns design necessary for Chisqr regressions.
-
+        self.t = np.array(t).astype(int)
+                
+        self.override_weights = override_weights
+        
+        self.phases = pd.Series({
+                                'pl' : 1j*0.,
+                                'cr' : 1j*np.pi/2.,
+                                'xz' : 1j*0.,
+                                'yz' : 1j*np.pi/2.,
+                                'br' : 1j*0.,
+                                'lo' : 1j*0.
+                                })
+                                
+        self.weights = pd.Series(index = bases_names)
+    
+    def getweights(self, angle=False):
+        
         # determine inclination angle
-        if iota==[]:
-            self.iota = self.syst.src.param['INC']
+        if not angle:
+            # no input
+            if 'iota' not in dir(self):
+                # no preset iota, take default
+                self.iota = self.syst.src.param['INC']
         else:
-            self.iota = iota
+            # take input angle
+            self.iota = angle
+        
+        # set weights
+        if self.kind == 'GR':
+            self.weights['pl'] = (1. + np.cos(self.iota)**2)/2.
+            self.weights['cr'] = np.cos(self.iota)
+            
+        elif self.kind == 'G4v':
+            self.weights['xz'] = np.sin(self.iota)
+            self.weights['yz'] = np.sin(self.iota)*np.cos(self.iota)
+        # if no one of the recognized templates (or if AP), set all to one    
+        else:
+            for p in self.syst.response.kinds:
+                self.weights[p] = 1.
+            
 
-        # get weights
-        self.weights = Weights(self.kind, angle=self.iota)
+    def design_matrix(self, incl=None):
+    
+        # check inclination angle and get weights
+        if not self.override_weights:
+            self.getweights(angle=incl)
         
         if self.kind=='Sid':
             th = pd.Series(sd.w * self.t, index=self.t)
@@ -637,26 +650,28 @@ class Signal(object):
             dm[components[self.kind][4]]=1
         else:
             dmDict = {}      
-            for pol in bases_aps[self.kind]:
-                dmDict[pol] = getattr(self.syst.response, pol) * getattr(self.weights, pol)/2.
+            for pol in self.syst.response.kinds:
+                dmDict[pol] = getattr(self.syst.response, pol) * self.weights[pol]/2.
             self.dm = pd.DataFrame(dmDict) # DF cols: comp. names, index: t.
-            
-        return dm
 
             
-    def sim(self, kind, phase=0, phasedif=np.pi/2.):
+    def simulate(self, h0, incl=[]):
+        '''
+        Simulates a signal based on the class.
+        To change phase differences, modify self.phases[pol] argument before calling.
+        '''
     
-        i0 = self.ps[kind][0] # gets corresponding component names
-        i1 = self.ps[kind][1]
-        
-        h, F = self.getcomponents(kind)
-        dm1 = F[i0].T[self.psr] * h[i0][self.psr]
-        dm2 = F[i1].T[self.psr] * h[i1][self.psr]
-        
-        hinj = [h_i/2.0 for h_i in self.h0]
-        
-        s = np.multiply.outer((dm1*np.exp(1j*phase) + dm2*np.exp(1j*(phase+phasedif))), hinj)
-        
-        signal = pd.DataFrame(s, index=self.t)
-
-        return signal
+        if self.kind=='Sid':
+            print 'Cannot simulate "Sid". Change Signal.kind?'
+        else:
+            # form design matrix
+            self.design_matrix(incl=incl)
+            
+            # raise phases to exponent (apply),
+            # multiply amplitudes and phases (mul),
+            # drop extra columns which come in from phases (dropna),
+            # add up columns (sum).
+            s = self.dm.mul(self.phases.apply(np.exp)).dropna(axis=1).sum(axis=1)
+            
+            # multiply signal by strengths 
+            self.signal = pd.DataFrame(np.multiply.outer(s, h0), index=s.index)

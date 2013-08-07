@@ -10,6 +10,7 @@ files/
     background/
     templates/
         antennapatterns/
+        vectors/
     remote/
         source/
         ephemerides/
@@ -20,7 +21,14 @@ import os
 
 from numpy import pi
 
-leafList = ('analysis/results/', 'data/ephemerides/', 'background/', 'templates/antennapatterns')
+leafList = (
+            'analysis/results/',
+            'data/ephemerides/',
+            'background/',
+            'templates/antennapatterns',
+            'templates/vectors'
+            )
+            
 def makestructure():
     print 'Creating file structure:'
     # create files/
