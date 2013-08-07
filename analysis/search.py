@@ -8,10 +8,9 @@ import pandas as pd
 import scipy.linalg
 
 import paths
-from templates import antennapatterns as ap
-from templates import sidereal as sd
-from templates import simulate
-from templates.source import getpsrlist
+from templates_OLD import sidereal as sd
+from templates_OLD import simulate
+from templates import getpsrlist
 
 from time import time
 
@@ -159,16 +158,20 @@ class Search(object):
         self.det = det              # LHO, LLO, etc.
         self.psr = psr              # PSR name
         self.data = data            # pd.DF w/ index: t, columns: freqs
+        
         self.t = np.array(data.index)
         self.instNames = data.columns
         
         # take first inst to get sigma
         self.inst0 = data[self.instNames[0]]
         self.sg = 2 * getsigma(self.inst0, self.psr)
-#         print 'one sigma'
 
         # form data DF
         self.y = self.data.div(self.sg, axis=0)
+        
+        # injection
+        self.hasinjections = False
+        self.hinj = np.array([0]*len(self.instNames))
         
         
     def chi(self, kind, F=[]):
@@ -243,8 +246,8 @@ class Search(object):
         else:
             aPs = []
             
-        h = pd.DataFrame(index=self.instNames, columns=methods)
-        s = pd.DataFrame(index=self.instNames, columns=methods)
+        h = pd.DataFrame(index=self.hinj, columns=methods)
+        s = pd.DataFrame(index=self.hinj, columns=methods)
              
         for basis in methods:
             a, cov = self.chi(basis, F=aPs)
@@ -277,13 +280,8 @@ class Search(object):
 
         # update y vector for regressions  
         self.y = self.data.div(self.sg, axis=0)
+        self.hasinjections = True
+        self.hinj = inj
         
         print '%(injkind)s signal injected.' % locals()
         
-        return inj
-        
-
-# class Tmat(object):
-# 
-#         def __ini__(self):
-#             try:

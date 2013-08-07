@@ -8,7 +8,8 @@ import pandas as pd
 
 # from analysis import search
 # from templates import simulate
-from templates2 import detnames, System
+from templates import detnames, System
+from analysis import search
 import paths
 
 
@@ -151,8 +152,9 @@ class Background(object):
         self.fset = {n : freq[n*filesize:min(len(freq),(n+1)*filesize)] for n in range(self.nsets)}
         
         # storing info
-        self.backdir = paths.rhB + self.seed.det + '/' + psr + '/'
-        self.backname = 'back_' + psr + '_' + self.seed.det + '_'
+        self.dir = paths.rhB + self.seed.det + '/' + psr + '/'
+        self.name = 'back_' + psr + '_' + self.seed.det + '_'
+        self.path = self.dir + self.name
     
              
     def create(self):
@@ -163,13 +165,13 @@ class Background(object):
         
         # create background directory
         try:
-            os.makedirs(self.backdir)
+            os.makedirs(self.dir)
         except OSError:
             pass
             
         # create background files
         for n in range(self.nsets):
-            path = self.backdir + self.backname + str(n)
+            path = self.dir + self.name + str(n)
             
             try:
                 rh = pd.HDFStore(path, 'w')
@@ -182,7 +184,7 @@ class Background(object):
         comments = '# ' + self.seed.detector + '\n# ' + self.seed.psr + '\n# ' + str(now) + '\n'
         fileinfo = 'nsets\tfilesize\n' + str(self.nsets) + '\t' + str(self.filesize)
         try:
-            f = open(self.backdir + 'log.txt', 'w')
+            f = open(self.dir + 'log.txt', 'w')
             f.write(comments + fileinfo)
         finally:
             f.close()
@@ -194,13 +196,13 @@ class Background(object):
         '''
         # read log
         try:
-            readme = pd.read_table(self.backdir + 'log.txt', sep='\s+', skiprows=3)
+            readme = pd.read_table(self.dir + 'log.txt', sep='\s+', skiprows=3)
             log_nfiles = readme['nsets'].ix[0]
             log_filesize = readme['filesize'].ix[0]
             log_nfreq = log_nfiles * log_filesize
             
             # get actual number of background files in directory
-            files = [name for name in os.listdir(self.backdir) if 'back' in name]
+            files = [name for name in os.listdir(self.dir) if 'back' in name]
             nfiles = len(files)
             
             if nfiles!=log_nfiles or log_nfreq!=len(self.freq):
@@ -214,11 +216,52 @@ class Background(object):
 #         return files
 
 
+class Results(object):
+    
+    def __init__(self, info, methods, hinj, injkind=None, injpdif=None):
+        self.syst = info
+        self.methods = methods
+        self.hinj = hinj
+        self.injkind = injkind
+        self.injpdif = injpdif
+        
+        self.h = pd.DataFrame(columns = methods)
+        self.s = pd.DataFrame(columns = methods)
+        
+        self.dir = paths.results + self.syst.detector + '/' + self.syst.psr + '/' 
+        self.name = self.syst.psr + '_' + self.syst.detector + '_' + self.injkind + '_' + paths.pname(injpdif) + '_'
+        self.path = self.dir + self.name
+        self.issaved =  False
+        
+    def save(self, what, rec):
+    
+        try:
+            os.makedirs(self.dir)
+        except OSError:
+            pass
+            
+        try:
+            f = pd.HDFStore(self.path, 'w')
+            f['h'] = self.h
+            f['s'] = self.s
+        finally:
+            f.close()
+            
+        self.issaved = True
+        
+                    
+    def checkInjections(self):
+        if self.hinj == h.index:
+            print 'All good'
+        else:
+            print 'Something is wrong...'
+
+
 class InjSearch(object):
     
     def __init__(self, detector, psr, nfreq, injkind, ninj, frange=[1.0e-7, 1.0e-5], hinjrange=[1.0E-27, 1.0E-24], filesize=100):
         
-        self.info = System(detector, psr)
+        self.syst = System(detector, psr)
         
         # rehet info
         self.freq = np.linspace(frange[0], frange[1], nfreq)
@@ -227,88 +270,38 @@ class InjSearch(object):
         
         # injection info
         self.hinj = np.linspace(hinjrange[0], hinjrange[1], ninj)
-        self.injkind = injkind  
+        self.injkind = injkind
+        
+        self.hperfile = int(len(self.hinj)/self.background.nsets)
+        self.injset = {n : self.hinj[self.hperfile*n:(n+1)*self.hperfile] for n in range(self.background.nsets)}
         
         print hinjrange
         
     def analyze(self, methods, injpdif=np.pi/2.):
-        '''
-        Loads a background file, analyzes it feeding it to search by PSR, saves results 
-        by pulsar. Loops over files and returns dictionary with h_rec and sig dataframes
-        for each PSR (i.e. there are 2 DFs for each PSR key).
-        '''
         
         # background
         self.background.get()
-        
         print 'Analyzing %d files.' % self.background.nsets
         
-        ## Set up injections
-        self.hperfile = int(len(self.hinj)/self.background.nsets)
-        injset = {back_paths[n] : self.hinj[hperfile*n:(n+1)*hperfile] for n in range(0, nsets)}
+        # results
+        self.results = Results(self.syst, methods, self.hinj, injkind=self.injkind, injpdif=injpdif)
 
-        ## Process first file to get PSR list and initialize storage variables.
-        try:
-            file0 = pd.HDFStore(back_paths[0], 'r')
-            psrlist = [s.strip('/') for s in file0.keys()]
-        
-            h = {}
-            s = {}
-            for psr in psrlist:  
-                          
-                injsrch0 = search.Search(self.det, psr, file0[psr])
-                inj0 = injsrch0.inject(self.injkind, injset[back_paths[0]], pdif=injpdif)
-                h[psr], s[psr] = injsrch0.generalChi(methods)
-                                
-                if psr==psrlist[0]:
-                    inj = inj0
-
-        finally:
-            file0.close()
-            
-        ## Loop over rest of the files
-        for path in back_paths[1:]:
+        # loop over files
+        for n in range(self.background.nsets):
             try:
-                back_file = pd.HDFStore(path, 'r')
+                back_file = pd.HDFStore(self.background.path + str(n), 'r')
+        
+                injsrch = search.Search(self.det, psr, back_file[psr])
+                injsrch.inject(self.injkind, self.injset[n], pdif=injpdif)
+                
+                h_file, s_file = injsrch.generalChi(methods)
             
-                for psr in psrlist:
-                    injsrch = search.Search(self.det, psr, back_file[psr])
-                    inj_file = injsrch.inject(self.injkind, injset[path], pdif=injpdif)
-                    
-                    h_file, s_file = injsrch.generalChi(methods)
-
-                    h[psr] = pd.concat([h[psr], h_file], ignore_index=True)
-                    s[psr] = pd.concat([s[psr], s_file], ignore_index=True)
-                    
-                    if psr==psrlist[0]:
-                        inj = np.concatenate([inj, inj_file])
+                self.results.h.append(h_file)
+                self.results.s.append(s_file)
+                
             finally:
                 back_file.close()
                 
         ## Save
-        hs_path = paths.results + self.detector + '/' + self.detector + '_' + self.injkind + '_' + paths.pname(injpdif) + '_'
-        try:
-            print 'saving h'
-            h_save = pd.HDFStore(hs_path + 'h', 'w')
-            for key, psr_h in h.iteritems():
-                h_save[key] = psr_h
-        except IOError:
-            print 'ERROR: %(hs_path)s does not exist.' % locals()
-        finally:
-            h_save.close()
-            
-        try:
-            s_save = pd.HDFStore(hs_path + 's', 'w')
-            for key, psr_s in s.iteritems():
-                s_save[key] = psr_s
-        finally:
-            s_save.close()
+        self.results.save()
 
-        try:
-            os.remove(hs_path + 'hinj.npy')
-        except OSError:
-            pass
-            
-        np.save(hs_path + 'hinj', inj)
-
-        return h, s, inj
