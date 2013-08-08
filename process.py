@@ -10,8 +10,9 @@ import pandas as pd
 # from analysis import search
 # from templates import simulate
 import templates
-from templates import detnames, System
+from templates import System
 import sidereal as sd
+from sidereal import detnames
 import paths
 
 

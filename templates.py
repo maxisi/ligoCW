@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -6,86 +7,15 @@ from collections import namedtuple
 
 import sys, os
 from sys import argv, exit
+import copy
 
 import sidereal as sd
 import paths
 
-
-paramNames = ['#', None, 'RAS', 'RAS error', 'DEC', 'DEC error']
-extraParamNames = [None, 'POL', 'POL error', 'INC', 'INC error']
-
-# Detector parameters, all angles in radians. (Source: PRD 58, 063001 p3.)
-detectors = pd.DataFrame({
-        'LHO': {
-                'lat': 0.8107054375513661,
-                'lon': -2.084097659806429,
-                'x_east': 2.199114857512855,
-                'arm_ang': np.pi/2
-                },
-    
-        'LLO': {
-                'lat': 0.5333726194094671, 
-                'lon': -1.584235362035253,
-                'x_east': 3.4505159311927893,
-                'arm_ang': np.pi/2
-                },
-    
-        'GEO': {
-                'lat': 0.9119345341670372,
-                'lon': 0.17121679962064373,
-                'x_east': 0.37716565135597474,
-                'arm_ang': 1.646369083406251
-                },
-    
-        'VIR': {
-                'lat': 0.761487152645126,
-                'lon': 0.1832595714594046,
-                'x_east': 1.2479104151759457,
-                'arm_ang': 1.5707963267948966
-                },
-    
-        'TAM': {
-                'lat': 0.6227334771115768,
-                'lon': 2.4354324382328874,
-                'x_east': 3.141592653589793,
-                'arm_ang': 1.5707963267948966
-                }
-        })
-
-bases_names = ['pl', 'cr', 'xz', 'yz', 'br']
-
-bases_tempNames = ['GR', 'G4v', 'AP', 'Sid']
-
-bases_aps = {
-        'GR' : ['pl', 'cr'],
-        'G4v': ['xz', 'yz'],
-        'AP' : ['pl', 'cr', 'xz', 'yz', 'br'],
-        'Sid': []
-    } 
+reload(sd)
     
 #  vector container to make it easy to move vectors around
 Vectors = namedtuple('Vectors', ['dx', 'dy', 'wx', 'wy', 'wz'])
-
-def detnames(d):
-    if d in ['H1', 'H2']:
-        det = 'LHO'
-    elif d == 'L1':
-        det = 'LHO'
-    elif d == 'V1':
-        det = 'VIR'
-    elif d in['LHO', 'LLO', 'VIR']:
-        det = d
-    else:
-        print 'ERROR: %r is an unknown detector name.' % d
-        exit()
-    return det
-
-components = {
-            'GR' : ['F+', 'Fx'],
-            'G4v': ['Fxz', 'Fyz'],
-            'AP' : ['pl', 'cr', 'xz', 'yz', 'br'],
-            'Sid': ['cos1', 'cos2', 'sin1', 'sin2', 'cnst']
-            }
 
 
 ## SOURCE
@@ -208,7 +138,7 @@ class Source(object):
         north = np.array([0, 0, 1])
         
         # take source location vector components in celestial coordinates and invert direction multiplying by -1 to get wave vector wz
-        wz = [-np.cos(self.param['DEC'])*np.cos(self.param['RAS']), -np.cos(self.param['DEC'])*np.sin(self.param['RAS']), -np.sin(self.param['DEC'])] 
+        wz = [-math.cos(self.param['DEC'])*math.cos(self.param['RAS']), -math.cos(self.param['DEC'])*math.sin(self.param['RAS']), -math.sin(self.param['DEC'])] 
         self.wz = pd.Series(wz, name=self.psr, index=['x', 'y', 'z'])
         
         
@@ -227,15 +157,16 @@ class Source(object):
             f['wz'] = self.wz
         finally:
             f.close()
-            
+         
+###         
 
-## DETECTOR
+# DETECTOR
 class Detector(object):
     
     def __init__(self, d, t=[]):
         self.id = d  
-        self.name = detnames(d)
-        self.param = detectors[self.name]
+        self.name = sd.detnames(d)
+        self.param = sd.detectors[self.name]
         self.t = np.array(t).astype(int)
         self.nentries = len(t)
         self.path = paths.vectors + 'detVec_' + self.name
@@ -270,7 +201,7 @@ class Detector(object):
             self.dx.columns
         except AttributeError:
             self.fileload()
-        if self.dx.index.tolist()==self.t:
+        if all(self.dx.index.tolist()==self.t):
             # All times present.
             pass
         else:
@@ -295,7 +226,7 @@ class Detector(object):
         offset = 67310.5484088*sd.w   # Aries-Greenwich angle at fiducial time (GMST)
         th = np.add.outer(offset+sd.w*(t-630763213), lon) # (LMST) rows: t, columns: det
         
-        zenith = [np.cos(lat)*np.cos(th), np.cos(lat)*np.sin(th), np.tile(np.sin(lat),(length,1))]  # [[x0, ...], [y0, ...], [z0, ...]]
+        zenith = [math.cos(lat)*math.cos(th), math.cos(lat)*math.sin(th), np.tile(math.sin(lat),(length,1))]  # [[x0, ...], [y0, ...], [z0, ...]]
         zenith /= np.sqrt(np.sum(np.array(zenith) ** 2., axis=0))
         
         localEast = np.cross(northPole,zenith, axisb=0)    # [[x, y, z], ...]
@@ -303,12 +234,12 @@ class Detector(object):
         
         localNorth = np.cross(zenith, localEast, axisa=0)   # [[x, y, z], ...]
         
-        xArm = np.cos(x_east)*localEast+np.sin(x_east)*localNorth
+        xArm = math.cos(x_east)*localEast+math.sin(x_east)*localNorth
         xArm /= np.sqrt(np.sum(xArm ** 2., axis=1))[..., None]
         self.dx = pd.DataFrame(xArm, index=t, columns= ['x', 'y', 'z'])
         
         perp_xz = np.cross(zenith, self.dx, axisa=0)
-        yArm = xArm*np.cos(arm_ang) + perp_xz*np.sin(arm_ang) # equals perp_xz when angle between arms is 90deg
+        yArm = xArm*math.cos(arm_ang) + perp_xz*math.sin(arm_ang) # equals perp_xz when angle between arms is 90deg
         yArm /= np.sqrt(np.sum(yArm ** 2, axis=1))[..., None]
         self.dy = pd.DataFrame(yArm, index=t, columns= ['x', 'y', 'z'])
         
@@ -323,30 +254,10 @@ class Detector(object):
         finally:
             f.close()
 
-## ANTENNA PATTERNS
-    
-bases_polNames = {
-            'pl': 'plus',
-            'cr': 'cross',
-            'xz': 'vector_x',
-            'yz': 'vector_y',
-            'br': 'breathing',
-            'lo': 'longitudinal'
-            }
 
+###
 
-# tuples indicating which vectors need to be multiplied together
-# note that detector vectors should be listed second for broadcasting reasons
-polComponents = {
-                'pl' : [('wx','dx'), ('wx','dy'), ('wy','dx'), ('wy','dy')],
-                'cr' : [('wx','dx'), ('wx','dy'), ('wy','dx'), ('wy','dy')],
-                'xz' : [('wx','dx'), ('wz','dx'), ('wx','dy'), ('wz','dy')],
-                'yz' : [('wy','dx'), ('wz','dx'), ('wy','dy'), ('wz','dy')],
-                'br' : [('wx','dx'), ('wx','dy'), ('wy','dx'), ('wy','dy')],
-                'lo' : [('wz','dx'), ('wz','dy')]
-                }
-
-
+# ANTENNA PATTERNS
 class Polarizations(object):
     '''
     Produces detector response for different polarization given input detector and
@@ -361,7 +272,7 @@ class Polarizations(object):
                     
     def product(self, polKey):
         # check all necessary vector products exist. Otherwise, create them.
-        for pair in polComponents[polKey]:
+        for pair in sd.polComponents[polKey]:
         
             pairName = pair[0] + pair[1]    # 'wxdx' = ('wx','dx')[0] + ('wx','dx')[1]
             
@@ -412,8 +323,8 @@ class Polarizations(object):
         # Modified:1/2 (based on derivation of dyadic products using tensors shown in 
         # "Gravitational wave polarizations" by Bryant Garcia.
         # The factor of 2 shouldn't be there)
-        
-    
+
+
 class Response(object):
     '''
     Contains response of 'det' to signals from source 'psr' of kind 'kinds', over 't'.
@@ -433,29 +344,29 @@ class Response(object):
     '''
     
     def __init__(self, psr, det, t, kinds, loadvectors=False):
-        self.det = detnames(det)
+        self.det = sd.detnames(det)
         self.t = np.array(t)
         
         self.psr = psr
         self.path = paths.ap + 'ap' + psr + '_' + self.det
         
-        if kinds in bases_tempNames:
+        if kinds in sd.tempNames:
             # requesting bases for preset template
-            self.kinds = bases_aps[kinds]
-        elif isinstance(kinds, list) and all([k in bases_tempNames for k in kinds]):
+            self.kinds = sd.aps[kinds]
+        elif isinstance(kinds, list) and all([k in sd.tempNames for k in kinds]):
             # list of preset templates
-            self.kinds = sum([bases_aps[temp] for temp in kinds], [])
-        elif all([k in bases_names for k in kinds]) and not isinstance(kinds, basestring):
+            self.kinds = sum([sd.aps[temp] for temp in kinds], [])
+        elif all([k in sd.names for k in kinds]) and not isinstance(kinds, basestring):
             # requesting bases by name
             self.kinds = kinds
-        elif isinstance(kinds, basestring) and kinds in bases_names:
+        elif isinstance(kinds, basestring) and kinds in sd.names:
             self.kinds = [kinds]
         else:
             # wrong input
             print 'ERROR: %(kinds)s is not recognized as a valid basis. ap19' % locals()
             print 'Valid bases are:'
-            print '\t %r' % bases_names
-            print '\t %r' % bases_aps
+            print '\t %r' % sd.names
+            print '\t %r' % sd.aps
             exit()
             
         self.hasvectors = False
@@ -480,15 +391,15 @@ class Response(object):
         else:
             self.psi = psi
             
-        wxRot = -self.src.wy*np.cos(self.psi) + self.src.wx*np.sin(self.psi)
-        wyRot = self.src.wx*np.cos(self.psi) + self.src.wy*np.sin(self.psi) 
+        wxRot = -self.src.wy*math.cos(self.psi) + self.src.wx*math.sin(self.psi)
+        wyRot = self.src.wx*math.cos(self.psi) + self.src.wy*math.sin(self.psi) 
         
         # Package vectors
         vecs = Vectors(self.obs.dx, self.obs.dy, self.src.wx, self.src.wy, self.src.wz)      
            
         # Get polarizations
         pols = Polarizations(vecs)
-        [setattr(self, k, getattr(pols, bases_polNames[k])() ) for k in self.kinds]
+        [setattr(self, k, getattr(pols, sd.polNames[k])() ) for k in self.kinds]
             
         # Save if requested
         if savefile:
@@ -501,7 +412,6 @@ class Response(object):
                 
         self.haspatterns = True
     
-
     def get(self):
         # Assumes no APs loaded. Otherwise, will re-write.
         
@@ -538,25 +448,25 @@ class Response(object):
                 apFile.close()
             self.haspatterns = True        
         
-#     def exportAPmatlab(psr, detname, t):
-#         p = ap.getAP('LHO', t)
-#     
-#     #     psrdict = {
-#     #                 'pl':pl.T[psr].tolist(),
-#     #                 'cr':cr.T[psr].tolist(),
-#     #                 'br':br.T[psr].tolist(),
-#     #                 'lo':lo.T[psr].tolist(),
-#     #                 'xz':xz.T[psr].tolist(),
-#     #                 'yz':yz.T[psr].tolist()
-#     #                 }
-#     
-#         sio.savemat('%(paths.ap)scrab_py' % locals(), p)
+    def exportAPmatlab(psr, detname, t):
+        p = ap.getAP('LHO', t)
+    
+    #     psrdict = {
+    #                 'pl':pl.T[psr].tolist(),
+    #                 'cr':cr.T[psr].tolist(),
+    #                 'br':br.T[psr].tolist(),
+    #                 'lo':lo.T[psr].tolist(),
+    #                 'xz':xz.T[psr].tolist(),
+    #                 'yz':yz.T[psr].tolist()
+    #                 }
+    
+        sio.savemat('%(paths.ap)scrab_py' % locals(), p)
 
 
 class System(object):
     def __init__(self, detector, psr):
         self.detector = detector
-        self.det = detnames(detector)
+        self.det = sd.sd.detnames(detector)
         self.psr = psr
         
         self.src = Source(psr)
@@ -565,99 +475,126 @@ class System(object):
     def interact(self, t, kinds):
         self.response = Response(self.psr, self.detector, t, kinds)
         self.response.get()        
+       
+###      
         
 ## SIMULATE            
-
 class Signal(object):
     '''
-    Can generate a signal. Possible returns: signal (time series), design matrix.
+    Sets absolute properties of a signal: detector, PSR, template and phase difference
+    between components. A time vector must also be provided.
+    Includes methods to return design matrix and simulated signal given extra inputs
+    of polarization and inclination angles.
     '''
 
-    def __init__(self, syst, kind, t, isloaded=False, override_weights=False):
-        # system contains source and detector information
-        self.syst = syst
-        # when the system interacts, it creates antenna patterns
-        if not isloaded:
-            self.syst.interact(t, kind)
-        
-        self.kind = kind
-        
-        self.t = np.array(t).astype(int)
-                
-        self.override_weights = override_weights
-        
-        self.phases = pd.Series({
-                                'pl' : 1j*0.,
-                                'cr' : 1j*np.pi/2.,
-                                'xz' : 1j*0.,
-                                'yz' : 1j*np.pi/2.,
-                                'br' : 1j*0.,
-                                'lo' : 1j*0.
-                                })
-                                
-        self.weights = pd.Series(index = bases_names)
+    def __init__(self, detector, psr, kind, pdif, t, isloaded=False):
     
-    def getweights(self, angle=False):
+        # source and detector information
+        self.detector = detector
+        self.det = sd.detnames(detector)
+        self.psr = psr
+        
+        # time
+        self.t = t
+        
+        # signal info
+        self.kind = kind
+        self.basis = sd.aps[kind]
+        self.pdif = sd.phase(pdif)
+        
+        # get antenna patterns
+        self.response = Response(psr, detector, t, kind, loadvectors=True)
+        
+    
+    def signalinfo(self, pdif, iota=False, p=0, h_s=0, pdif_s=0):
         
         # determine inclination angle
-        if not angle:
-            # no input
-            if 'iota' not in dir(self):
-                # no preset iota, take default
-                self.iota = self.syst.src.param['INC']
-        else:
-            # take input angle
-            self.iota = angle
-        
-        # set weights
+        if not iota:
+            # no preset iota, take default
+            iota = self.response.src.param['INC']
+
+        # return dataframe with amplitude (h) and phase (phi) for each component
+        info = pd.DataFrame(index=self.basis, columns=['h', 'p'])      
+
+        # set amplitudes and phases
         if self.kind == 'GR':
-            self.weights['pl'] = (1. + np.cos(self.iota)**2)/2.
-            self.weights['cr'] = np.cos(self.iota)
+            info['h']['pl'] = (1. + math.cos(iota)**2)/2.
+            info['h']['cr'] = math.cos(iota)
+            
+            info['p']['pl'] = p
+            info['p']['cr'] = p + pdif
             
         elif self.kind == 'G4v':
-            self.weights['xz'] = np.sin(self.iota)
-            self.weights['yz'] = np.sin(self.iota)*np.cos(self.iota)
-        # if no one of the recognized templates (or if AP), set all to one    
-        else:
-            for p in self.syst.response.kinds:
-                self.weights[p] = 1.
+            info['h']['xz'] = math.sin(iota)
+            info['h']['yz'] = math.sin(iota) * math.cos(iota)
             
+            info['p']['xz'] = p
+            info['p']['yz'] = p + pdif
 
-    def design_matrix(self, iota=None):
-    
-        # check inclination angle and get weights
-        if not self.override_weights:
-            self.getweights(angle=iota)
+        elif self.kind == 'GRs':
+            info['h']['pl'] = (1. + math.cos(iota)**2)/2.
+            info['h']['cr'] = math.cos(iota)
+            info['h']['br'] = h_s
+            
+            info['p']['pl'] = p
+            info['p']['cr'] = p + pdif
+            info['p']['br'] = p + pdif_s
+            
+        else:
+            print 'Warning: %s is not a recognized template (temp 541)'
+            exit()
+            
+        return info
+        
+
+    def design_matrix(self, pol_angle, incl_angle, h_scalar=0):        
         
         if self.kind=='Sid':
+            # no need to get antenna patterns
+            # build basis set:
             th = pd.Series(sd.w * self.t, index=self.t)
-            basis = [np.cos(th), np.cos(2.*th), np.sin(th), np.sin(2.*th)]
-            self.dm = pd.concat(basis, axis=1, keys=components[self.kind][0:4])
-            self.dm[components[self.kind][4]]=1
-        else:
-            dmDict = {}      
-            for pol in self.syst.response.kinds:
-                dmDict[pol] = getattr(self.syst.response, pol) * self.weights[pol]/2.
-            self.dm = pd.DataFrame(dmDict).dropna(axis=1) # DF cols: comp. names, index: t.
-
+            basis = [math.cos(th), math.cos(2.*th), math.sin(th), math.sin(2.*th)]
             
-    def simulate(self, h0, incl=[]):
+            # construct matrix
+            dm = pd.concat(basis, axis=1, keys=['cos1', 'cos2', 'sin1', 'sin2'])
+            dm['cnst']=1
+
+        else:
+            # make copy of response
+            response_local = copy.copy(self.response)
+            # get antenna patterns:
+            response_local.create(psi=pol_angle, savefile=False)
+            
+            # get amplitude info
+            info = self.signalinfo(0, iota=incl_angle, h_s=h_scalar)
+            
+            # construct matrix
+            dmDict = {pol: getattr(response_local, pol) * info['h'][pol]/2. for pol in self.basis}
+            dm = pd.DataFrame(dmDict).dropna(axis=1) # DF cols: comp. names, index: t.
+        
+        return dm
+            
+    def simulate(self, pol_angle, incl_angle, h_scalar=0, pdif_scalar=0):
         '''
-        Simulates a signal based on the class.
-        To change phase differences, modify self.phases[pol] argument before calling.
+        Simulates a signal based given polarization and inclination angles.
+        Warning: Does not scale output signal, need to multiply output by h0.
         '''
     
         if self.kind=='Sid':
-            print 'Cannot simulate "Sid". Change Signal.kind?'
+            print 'Cannot simulate "Sid". Change Signal.kind'
         else:
             # form design matrix
-            self.design_matrix(iota=incl)
+            dm = self.design_matrix(pol_angle, incl_angle, h_scalar=h_scalar)
+            
+            # get phase info
+            info = self.signalinfo(self.pdif, iota=0, pdif_s=pdif_scalar)
             
             # raise phases to exponent (apply),
             # multiply amplitudes and phases (mul),
             # drop extra columns which come in from phases (dropna),
             # add up columns (sum).
-            s = self.dm.mul(self.phases.apply(np.exp)).dropna(axis=1).sum(axis=1)
+            s = dm.mul(info['p'].apply(math.exp)).dropna(axis=1).sum(axis=1)
             
             # multiply signal by strengths 
-            self.signal = pd.DataFrame(np.multiply.outer(s, h0), index=s.index)
+#             s = pd.DataFrame(np.multiply.outer(s, h0), index=s.index)
+            return s
