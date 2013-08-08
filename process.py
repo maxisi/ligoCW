@@ -11,7 +11,7 @@ import pandas as pd
 # from templates import simulate
 import templates
 from templates import detnames, System
-from templates_OLD import sidereal as sd
+import sidereal as sd
 import paths
 
 
@@ -49,8 +49,10 @@ def het(vector, f, *arg):
 
 
 class Data(object):
-
-    def __init__(self, detector, psr):
+    '''
+    Holds original data and related information.
+    '''
+    def __init__(self, detector, psr):        
         self.detector = detector
         self.det = detnames(detector)
         self.psr = psr
@@ -138,6 +140,9 @@ class Data(object):
                 
 
 class Background(object):
+    '''
+    Manages background files for a given detector and source: gets and creates.
+    '''
     def __init__(self, detector, psr, freq, filesize=100):
         # data
         self.seed = Data(detector, psr)
@@ -219,7 +224,9 @@ class Background(object):
 
 
 class Results(object):
-    
+    '''
+    Holds search results and contains methods to save them.
+    '''
     def __init__(self, info, methods, hinj, injkind=None, injpdif=None):
         self.syst = info
         self.methods = methods
@@ -263,11 +270,11 @@ class InjSearch(object):
     
     def __init__(self, detector, psr, nfreq, injkind, ninj, frange=[1.0e-7, 1.0e-5], hinjrange=[1.0E-27, 1.0E-24], filesize=100):
         
+        # PSR-detector system
         self.syst = System(detector, psr)
         
         # rehet info
         self.freq = np.linspace(frange[0], frange[1], nfreq)
-        
         self.background = Background(detector, psr, self.freq, filesize)
         
         # injection info

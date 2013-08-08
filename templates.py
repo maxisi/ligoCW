@@ -7,7 +7,7 @@ from collections import namedtuple
 import sys, os
 from sys import argv, exit
 
-from templates_OLD import sidereal as sd
+import sidereal as sd
 import paths
 
 
@@ -98,22 +98,6 @@ def currentCatalogue():
     except:
         print 'No pulsar catalogue found.'
         exit()
-        
-    
-def getpsrlist():
-    try:
-        with open(paths.psrlist, 'r') as f:
-            l = f.read()
-        
-            if len(l) == 0:
-                raise IOError
-            else:
-                psr_list = l.split(',')
-                return psr_list
-            
-    except IOError:
-        print 'ERROR: no pulsar list!'
-        exit(0)
         
 
 class Source(object):
@@ -286,7 +270,7 @@ class Detector(object):
             self.dx.columns
         except AttributeError:
             self.fileload()
-        if set(self.dx.index.tolist())==set(self.t):
+        if self.dx.index.tolist()==self.t:
             # All times present.
             pass
         else:
@@ -448,7 +432,7 @@ class Response(object):
     To do: Add option to select psi randomly from range?
     '''
     
-    def __init__(self, psr, det, t, kinds):
+    def __init__(self, psr, det, t, kinds, loadvectors=False):
         self.det = detnames(det)
         self.t = np.array(t)
         
@@ -476,7 +460,11 @@ class Response(object):
             
         self.hasvectors = False
         self.haspatterns = False
-                    
+        
+        if loadvectors:
+            self.src = Source(self.psr)
+            self.obs = Detector(self.det, self.t)
+            self.hasvectors = True                    
                 
     def create(self, savefile=True, psi=[]):
     
@@ -576,9 +564,8 @@ class System(object):
         
     def interact(self, t, kinds):
         self.response = Response(self.psr, self.detector, t, kinds)
-        self.response.get()
-
-
+        self.response.get()        
+        
 ## SIMULATE            
 
 class Signal(object):
