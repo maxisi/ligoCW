@@ -391,7 +391,7 @@ class System(object):
         
     
 def fakedata(ndays, t0=630720013):
-    t = np.arange(t0, t0 + ndays*sd.ss, 10*sd.periodLIGO)
-    d = [random.random() + 1j*random.random() for i in t]
+    t = np.arange(t0, t0 + ndays*sd.ss, 1000*sd.periodLIGO)
+    d = [random.random()*10**-21 + 1j*random.random()*10**-21 for i in t]
     data = pd.Series(d, index=t)
     return data
