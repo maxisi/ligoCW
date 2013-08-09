@@ -7,8 +7,8 @@ import math
 from sys import exit
 
 pltcolor = {
-            'GR' : 'g',
-            'G4v': 'r',
+            'GR' : 'c',
+            'G4v': 'm',
             'AP' : 'b',
             'Sid': 'c'
             }
@@ -67,15 +67,15 @@ def hinjs(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
     plt.xlabel('$h_{inj}$')
     plt.ylabel('Significance')
 
-    plt.legend(numpoints=1)
+    plt.legend(numpoints=1, loc=2)
     
 
 def hinjlins(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
 
     method_plot = plt.plot(hinj, s[methods].applymap(lambda x: np.sqrt(x)), style)
     
-#     for i in range(0, len(method_plot)):
-#         plt.setp(method_plot[i], color=pltcolor[methods[i]], label=methods[i])
+    for i in range(0, len(method_plot)):
+        plt.setp(method_plot[i], color=pltcolor[methods[i]], label=methods[i])
     
     linsmax = max([np.amax(s[m].map(lambda x: np.sqrt(x))) for m in methods])
 
@@ -92,6 +92,8 @@ def hinjrec(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
     
     for i in range(0, len(method_plot)):
         plt.setp(method_plot[i], color=pltcolor[methods[i]], label=methods[i])
+
+    plt.legend(numpoints=1, loc=2)
 
     hmax = max([np.amax(hrec[m]) for m in methods])
     

@@ -355,7 +355,7 @@ class InjSearch(object):
         print 'Analyzing %d files.' % self.background.nsets
     
         # search info
-        search = {m: templates.Signal(self.detector, self.psr, m, self.pdif, self.t) for m in methods}
+        search = {m: templates.Signal(self.detector, self.psr, m, 0, self.t) for m in methods}
 
         # results
         self.results = Results(self.detector, self.psr, methods=methods, hinj=self.hinj, kind=self.injkind, pdif=self.pdif)

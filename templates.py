@@ -201,12 +201,15 @@ class Detector(object):
             self.dx.columns
         except AttributeError:
             self.fileload()
-        if all(self.dx.index.tolist()==self.t):
-            # All times present.
-            pass
-        else:
-            self.createVectors()
         
+        try:
+            if all(self.dx.index.tolist()==self.t):
+                # All times present.
+                pass
+            else:
+                self.createVectors()
+        except TypeError:
+            self.createVectors()
 
     def createVectors(self):
         '''
@@ -217,7 +220,7 @@ class Detector(object):
         lon = self.param.ix['lon']
         x_east = self.param.ix['x_east']
         arm_ang = self.param.ix['arm_ang']
-        t = self.t
+        t = np.array([int(x) for x in self.t])
         length = self.nentries
 
         # Angle between detector and Aries (vernal equinox) at time t
@@ -226,7 +229,7 @@ class Detector(object):
         offset = 67310.5484088*sd.w   # Aries-Greenwich angle at fiducial time (GMST)
         th = np.add.outer(offset+sd.w*(t-630763213), lon) # (LMST) rows: t, columns: det
         
-        zenith = [math.cos(lat)*math.cos(th), math.cos(lat)*math.sin(th), np.tile(math.sin(lat),(length,1))]  # [[x0, ...], [y0, ...], [z0, ...]]
+        zenith = [np.cos(lat)*np.cos(th), np.cos(lat)*np.sin(th), np.tile(math.sin(lat),(length,1))]  # [[x0, ...], [y0, ...], [z0, ...]]
         zenith /= np.sqrt(np.sum(np.array(zenith) ** 2., axis=0))
         
         localEast = np.cross(northPole,zenith, axisb=0)    # [[x, y, z], ...]
@@ -390,9 +393,9 @@ class Response(object):
             self.psi = self.src.param['POL']
         else:
             self.psi = psi
-            
-        wxRot = -self.src.wy*math.cos(self.psi) + self.src.wx*math.sin(self.psi)
-        wyRot = self.src.wx*math.cos(self.psi) + self.src.wy*math.sin(self.psi) 
+
+        wxRot = -self.src.wy*np.cos(self.psi) + self.src.wx*np.sin(self.psi)
+        wyRot = self.src.wx*np.cos(self.psi) + self.src.wy*np.sin(self.psi) 
         
         # Package vectors
         vecs = Vectors(self.obs.dx, self.obs.dy, self.src.wx, self.src.wy, self.src.wz)      

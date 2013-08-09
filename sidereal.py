@@ -125,7 +125,7 @@ polNames = {
 # note that detector vectors should be listed second for broadcasting reasons
 polComponents = {
                 'pl' : [('wx','dx'), ('wx','dy'), ('wy','dx'), ('wy','dy')],
-                'cr' : [('wx','dx'), ('wx','dy'), ('wy','dx'), ('wy','dy')],
+                'cr' : [('wx','dx'), ('wy','dx'), ('wx','dy'), ('wy','dy')],
                 'xz' : [('wx','dx'), ('wz','dx'), ('wx','dy'), ('wz','dy')],
                 'yz' : [('wy','dx'), ('wz','dx'), ('wy','dy'), ('wz','dy')],
                 'br' : [('wx','dx'), ('wx','dy'), ('wy','dx'), ('wy','dy')],
