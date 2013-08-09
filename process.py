@@ -6,14 +6,16 @@ from time import time
 
 import numpy as np
 import pandas as pd
+import random
 
-# from analysis import search
-# from templates import simulate
 import templates
-from templates import System
 import sidereal as sd
-from sidereal import detnames
 import paths
+import psrplot
+
+reload(sd)
+reload(templates)
+reload(psrplot)
 
 
 def het(vector, f, *arg):
@@ -38,14 +40,14 @@ def het(vector, f, *arg):
         exit(0)
     
     temp = np.exp(2*np.pi*1j*np.multiply.outer(f, t))
-    print 'Template created.'
     
     try:
-        template = pd.DataFrame(temp, index=['f' + str(x) for x in range(0,len(f))], columns=t)
+        template = pd.DataFrame(temp, columns=t)
     except ValueError:
         template = pd.Series(temp, index=t)
     
     rh = vector*template
+    print 'Done'
     return rh.T
 
 
@@ -55,7 +57,7 @@ class Data(object):
     '''
     def __init__(self, detector, psr):        
         self.detector = detector
-        self.det = detnames(detector)
+        self.det = sd.detnames(detector)
         self.psr = psr
         
         # data info
@@ -164,7 +166,18 @@ class Background(object):
         self.name = 'back_' + psr + '_' + self.seed.det + '_'
         self.path = self.dir + self.name
     
-             
+    def writelog(self):
+        now = datetime.datetime.now()
+        comments = '# ' + self.seed.detector + '\n# ' + self.seed.psr + '\n# ' + str(now) + '\n'
+        fileinfo = 'nsets\tfilesize\n' + str(self.nsets) + '\t' + str(self.filesize)
+        
+        try:
+            f = open(self.dir + 'log.txt', 'w')
+            f.write(comments + fileinfo)
+        finally:
+            f.close()  
+            
+               
     def create(self):
         '''
         Re heterodynes and saves data at frequencies f. Number of heterodynes is determined by
@@ -187,15 +200,7 @@ class Background(object):
             finally:
                 rh.close()
         
-        # create log
-        now = datetime.datetime.now()
-        comments = '# ' + self.seed.detector + '\n# ' + self.seed.psr + '\n# ' + str(now) + '\n'
-        fileinfo = 'nsets\tfilesize\n' + str(self.nsets) + '\t' + str(self.filesize)
-        try:
-            f = open(self.dir + 'log.txt', 'w')
-            f.write(comments + fileinfo)
-        finally:
-            f.close()
+        self.writelog()
 
     def get(self):
         '''
@@ -228,23 +233,36 @@ class Results(object):
     '''
     Holds search results and contains methods to save them.
     '''
-    def __init__(self, info, methods, hinj, injkind=None, injpdif=None):
-        self.syst = info
+    def __init__(self, detector, psr, methods=[], hinj=[], pdif_s=None, kind=None, pdif=None):
+        # system
+        self.detector = detector
+        self.psr = psr
+        
+        # search
         self.methods = methods
+        
+        # injection
         self.hinj = hinj
-        self.injkind = injkind
-        self.injpdif = injpdif
+        self.kind = kind
+        self.pdif = pdif
+        self.pdif_s = pdif_s
         
-        self.h = pd.DataFrame(columns = methods)
-        self.s = pd.DataFrame(columns = methods)
+        # containers
+        self.h = pd.DataFrame(columns = methods, index=range(len(hinj)))
+        self.s = pd.DataFrame(columns = methods, index=range(len(hinj)))
         
-        self.dir = paths.results + self.syst.detector + '/' + self.syst.psr + '/' 
-        self.name = self.syst.psr + '_' + self.syst.detector + '_' + self.injkind + '_' + paths.pname(injpdif)
+        # saving
+        self.dir = paths.results + self.detector + '/' + self.psr + '/' 
+        self.name = self.psr + '_' + self.detector + '_' + self.kind + '_' + sd.phase2(pdif)
         self.path = self.dir + self.name
+        
         self.issaved =  False
         
     def save(self):
-    
+        
+        self.h.index = self.hinj
+        self.s.index = self.hinj
+        
         try:
             os.makedirs(self.dir)
         except OSError:
@@ -259,63 +277,151 @@ class Results(object):
             
         self.issaved = True
         
-                    
-    def checkInjections(self):
-        if self.hinj == h.index:
-            print 'All good'
-        else:
-            print 'Something is wrong...'
+        
+    def load(self):
+        try:
+            f = pd.HDFStore(self.path, 'r')
+            self.h = f['h']
+            self.s = f['s']
+        finally:
+            f.close()            
 
+    def plots(self, pltType, extra_name=''):
+
+        header = self.kind + sd.phase2(self.pdif) + ' injections on ' + self.detector + ' data for ' + self.psr + ' ' + extra_name
+          
+        getattr(psrplot, pltType)(hinj=self.h.index, hrec=self.h, s=self.s, methods=self.methods)
+        
+        plt.title(header)
+        
+        pltdir = 'plots/' + self.detector + '/' + self.kind + '/' + pltType + '/'
+        pltname = self.detector + '_' + self.kind + '_' + sd.phase2(self.pdif) + '_' + pltType + extra_name
+        save_to = pltdir + pltname
+        
+        try:
+            os.makedirs(pltdir)
+        except OSError:
+            pass
+            
+        plt.savefig(save_to, bbox_inches='tight')
+        plt.close()
+        
+        print 'Plot saved to:\n %(save_to)s' % locals()
+        
 
 class InjSearch(object):
     
-    def __init__(self, detector, psr, nfreq, injkind, ninj, frange=[1.0e-7, 1.0e-5], hinjrange=[1.0E-27, 1.0E-24], filesize=100):
-        
-        # PSR-detector system
-        self.syst = System(detector, psr)
-        
-        # rehet info
+    def __init__(self, detector, psr, nfreq, injkind, pdif, ninj, frange=[1.0e-7, 1.0e-5], hinjrange=[1.0E-27, 1.0E-24], filesize=100):
+        # system info
+        self.detector = detector
+        self.psr = psr
+                
+        # data info
         self.freq = np.linspace(frange[0], frange[1], nfreq)
+        print 'Getting background.'
         self.background = Background(detector, psr, self.freq, filesize)
+        self.background.get()
+        
+        self.t = self.background.seed.finehet.index
+        
+        self.sg = 2 * getsigma(self.background.seed.finehet, self.psr)
         
         # injection info
-        self.hinj = np.linspace(hinjrange[0], hinjrange[1], ninj)
+        inj = np.linspace(hinjrange[0], hinjrange[1], ninj)
+        injLocations = [int(x) for x in np.linspace(0, nfreq, ninj, endpoint=False)]
+        self.hinj = np.zeros(nfreq)
+        self.hinj[injLocations] = inj 
+               
+        self.pdif = pdif
         self.injkind = injkind
+        self.injection = templates.Signal(detector, psr, injkind, pdif, self.t)
         
-        self.hperfile = int(len(self.hinj)/self.background.nsets)
-        self.injset = {n : self.hinj[self.hperfile*n:(n+1)*self.hperfile] for n in range(self.background.nsets)}
+        src = self.injection.response.src
+
+        # range info
+        self.pol_range = [
+                        src.param['POL'],# - src.param['POL error'],
+                        src.param['POL'] #+ src.param['POL error']
+                        ]
+
+        self.inc_range = [
+                        src.param['INC'], #- src.param['INC error'],
+                        src.param['INC'] #+ src.param['INC error']
+                        ]
         
-        print hinjrange
-        
-    def analyze(self, methods, injpdif=np.pi/2.):
-        
-        # background
-        self.background.get()
+
+    def analyze(self, methods):
+
         print 'Analyzing %d files.' % self.background.nsets
-        
+    
+        # search info
+        search = {m: templates.Signal(self.detector, self.psr, m, self.pdif, self.t) for m in methods}
+
         # results
-        self.results = Results(self.syst, methods, self.hinj, injkind=self.injkind, injpdif=injpdif)
-        
-        srch = Search(self.syst, methods=methods)
-        
+        self.results = Results(self.detector, self.psr, methods=methods, hinj=self.hinj, kind=self.injkind, pdif=self.pdif)
+            
         # loop over files
         for n in range(self.background.nsets):
+            
             try:
                 back_file = pd.HDFStore(self.background.path + str(n), 'r')
-                
-                # initialize data
-                srch.initialize_data(back_file[self.syst.psr])
-                # inject
-                srch.inject(self.syst, self.injkind, self.injset[n], pdif=injpdif)
-                
-                h_file, s_file = srch.generalChi()
-            
-                self.results.h.append(h_file)
-                self.results.s.append(s_file)
-                
+                data = back_file[self.psr]
             finally:
                 back_file.close()
                 
+            # loop over instantiations
+            for inst in data.columns:
+                
+                inst_number = int(n*self.background.filesize + inst)
+                
+                print '%i/%i ' % (inst_number, len(self.hinj)-1),
+                
+                # select psi, iota and phi0
+                psi  = random.uniform(self.pol_range[0], self.pol_range[1])
+                iota = random.uniform(self.inc_range[0], self.inc_range[1])
+
+                psi_inj  = random.uniform(self.pol_range[0], self.pol_range[1])
+                iota_inj = random.uniform(self.inc_range[0], self.inc_range[1])
+                phi0 = 0#random.uniform(0., np.pi/2.)                    
+
+                print psi, iota, phi0
+                # loop over search methods
+                # note: important that this follows inst loop to get same psi and iota
+                for m in methods:
+                    
+                    d = data[inst]
+                    
+                    # inject if necessary
+                    h = self.hinj[inst_number]
+                    if h != 0:
+                        print 'I!',
+                        d += h * self.injection.simulate(psi_inj, iota_inj, phase=phi0)
+                    
+                    # get design matrix
+                    designMatrix = search[m].design_matrix(psi, iota)
+                    
+                    A = designMatrix.div(self.sg, axis=0)
+                    b = d / self.sg
+
+                    # SVD DECOMPOSITION
+                    svd = np.linalg.svd(A, full_matrices=False)
+
+                    U = pd.DataFrame(svd[0], index=b.index)
+                    W = pd.DataFrame(np.diag(1/svd[1]))
+                    V = pd.DataFrame(svd[2]) 
+
+                    cov = V.dot( V.T.dot( W**2))
+
+                    VtW = V.T.dot(W)
+                    # need to make U complex before dotting with b
+                    Uc = U + 0j
+                    Utb = Uc.mul(b, axis=0).sum(axis=0)
+                    
+                    a = VtW.dot(Utb.T)
+                    
+                    self.results.h[m][inst_number] = (abs(a[0]) + abs(a[1])) / 2.
+                    self.results.s[m][inst_number] = abs(np.dot(np.conj(a).T, np.linalg.solve(cov, a)))
+                    
         ## Save
         self.results.save()
 
@@ -371,251 +477,3 @@ def getsigma(d, psr):
         
     print 'Sigma is ready.'
     return sigma
-    
-
-def herm(A):
-    '''
-    Returns hermitian conjugate of A.
-    '''
-    return np.array(A).conjugate().T
-    
-    
-def svd_analysis(A, b):
-    '''
-    Performs SVD analysis on design matrix A and data y. "components" is a list with the
-    name of the regression components.
-    '''
-    start=time()
-    # get basis names
-    basisname = [name.replace('F', 'a') for name in A.columns]
-        
-    # perform SVD
-    U, s, V = np.linalg.svd(A, full_matrices=False)  # SVD of design matrix
-    W = np.diag(1/s)
-    
-    # get covariance matrix
-    cm = np.dot(np.dot(herm(V), W**2), V)
-    covmat = pd.DataFrame(cm, index=basisname, columns=basisname)
-        
-    # [N M] = np.shape(A);   % size of design matrix (row X column)
-    
-    # factors that will be used to comput regression coefficients
-    Vh_dot_W = np.dot(herm(V),W)
-    Uh = herm(U)
-    
-    try:
-        instnames = b.columns
-        a = {}
-        for i in instnames:
-            a[i] = np.dot(Vh_dot_W, np.dot(Uh, b[i]))
-            
-            # redchisqr = sum((A*a[i]-y[i]).^2)/(N-M);  % compute reduced chi squared
-            # sa = sqrt(redchisqr*diag(Covmat));   % uncertainties in coefficients
-
-    except AttributeError:
-        # if there's only one instantiation
-        a = np.dot(Vh_dot_W, np.dot(Uh, b))
-        
-    print time()-start
-    return a, covmat
-    
-
-def results(a, cov, inv=False):
-    '''
-    Returns h_rec and significance for given regression parameters a and covariance
-    matrix cov. If inv=True, assumes second parameter is inv(cov) instead of cov
-    (for use with QR decomposition).
-    '''
-    h=pd.Series(index=a.keys()); s=pd.Series(index=a.keys())
-    if inv==True:
-        for i in a.keys():
-            h.append( (abs(a[i][0]) + abs(a[i][1])) / 2 )
-            s.append(np.dot(herm(a[i]), (np.dot(cov, a[i]))).real)
-    else:
-        for i in a.keys():
-            h[i] = (abs(a[i][0]) + abs(a[i][1])) / 2
-            s[i] =abs(np.dot(herm(a[i]), (np.linalg.solve(cov, a[i]))))
-   
-    return h, s
-
-
-components = {
-            'GR' : ['pl', 'cr'],
-            'G4v': ['xz', 'yz'],
-            'AP' : ['pl', 'cr', 'xz', 'yz', 'br'],
-            'Sid': ['cos1', 'cos2', 'sin1', 'sin2', 'cnst']
-            }
-
-
-class Search(object):
-    '''
-    Searches for signals using model dependent and independent methods. Can take several
-    instantiations at once (columns of pd.DF), but assumes one single PSR.
-    '''
-    
-    def __init__(self, syst, data=False, methods=['GR', 'G4v', 'AP', 'Sid']):
-        self.syst = syst
-        self.det = syst.det              # LHO, LLO, etc.
-        self.psr = syst.psr              # PSR name
-        
-        if data:
-            self.initialize_data(data)
-            
-        self.methods = methods        
-
-        # injection
-        self.hasinjections = False
-        self.haspatterns = False
-
-        
-    def initialize_data(self, data):
-        self.data = data                 # pd.DF w/ index: t, columns: freqs
-        self.t = np.array(data.index)
-        self.instNames = data.columns
-    
-        # take first inst to get sigma
-        if 'sg' not in dir(self):
-            self.inst0 = data[self.instNames[0]]
-            self.sg = 2 * getsigma(self.inst0, self.psr)
-        
-        # get antenna patterns only first time
-        if not self.haspatterns:
-            self.syst.interact(self.t, self.methods)
-
-        # form data DF
-        self.y = self.data.div(self.sg, axis=0)
-        self.hinj = np.array([0]*len(self.instNames))
-        
-                 
-    def chi(self, syst, kind):
-        '''
-        Chisqr regression using SVD decomposition.
-        Optional: feed your own antenna patterns.
-        '''
-        print 'Regression to %(kind)s template...' % locals(),
-        
-        # in case not all
-        try:
-            if all([k in syst.response.kinds for k in templates.bases_aps[kind]]):
-                haspatterns = True
-            else:
-                haspatterns = False
-        except KeyError:
-            haspatterns = False
-            
-        signal = templates.Signal(syst, kind, self.t, isloaded=haspatterns)
-        signal.design_matrix()
-        desMat = signal.dm
-        
-        A = desMat.div(self.sg, axis=0)
-
-        a, covmat = svd_analysis(A, self.y)
-        
-        adf = pd.DataFrame(a, index=components[kind])
-        
-        print 'regression done.'
-
-        return adf, covmat
-        
-        
-    def qr(self, kind, F=[]):
-        '''
-        Chisqr regression using QR decomposition.
-        Optional: feed your own antenna patterns as F=.
-        '''
-        print 'QR regression to %(kind)s template...' % locals(),
-        
-        template = simulate.Signal(self.det, 1, self.t, self.psr, F)
-            
-        desMat = template.design_matrix()
-        A = desMat.div(self.sg, axis=0)
-        
-        # get covariance matrix
-        invcov = A.T.dot(A)
-        
-        # qr decomposition of A
-        Q, R = np.linalg.qr(A)
-        Qt = Q.T
-
-        # Loop over instantiations
-        a={}
-        try:
-            for i in self.instNames:
-                Qb = np.dot(Qt, self.y[i]) # computing Q^T*b (project b onto the range of A)
-                a[i] = scipy.linalg.solve_triangular(R, Qb, check_finite=False) # solving R*x = Q^T*b
-        except AttributeError:
-            Qb = np.dot(Qt, self.y) # computing Q^T*b (project b onto the range of A)
-            a = scipy.linalg.solve_triangular(R, Qb, check_finite=False) # solving R*x = Q^T*b
-        
-        adf = pd.DataFrame(a, index=components[kind])
-        
-        print 'regression done.'
-
-        return adf, invcov
-
-        
-    def generalChi(self, data=False):
-        '''
-        Performs indicated searches (default: all) and returns sig and h_rec Series for
-        each of them. Takes option methods = [...] indicating which regressions to do.
-        
-        '''
-        
-        if data:
-            self.initialize_data(data)
-            
-        h = pd.DataFrame(index=self.hinj, columns=self.methods)
-        s = pd.DataFrame(index=self.hinj, columns=self.methods)
-        
-        print 'Search methods:',
-        print self.methods
-        for basis in self.methods:
-            a, cov = self.chi(self.syst, basis)
-            h[basis], s[basis] = results(a, cov)
-        
-        return h, s
-        
-        
-    def inject(self, syst, injkind, hinj, pdif):
-        '''
-        Injects signals in data. WARNING: original data is modified, not copied.
-        Returns injection location vector.
-        '''
-        # get simulated signal
-        try:
-            if all([k in syst.response.kinds for k in templates.bases_aps[injkind]]):
-                haspatterns = True
-            else:
-                haspatterns = False
-        except KeyError:
-            haspatterns = False
-            
-        signal = templates.Signal(syst, injkind, self.t, isloaded=haspatterns)
-
-        signal.phases['cr'] = pdif
-        signal.phases['yz'] = pdif
-
-            
-        signal.simulate(hinj)
-        sim = signal.signal
-        
-        nfreq = len(self.data.columns)
-        ninj = len(sim.columns)
-        
-        # build injection vector
-        injLocations = [int(x) for x in np.linspace(0, nfreq, ninj, endpoint=False)]
-        inj = np.zeros(nfreq)
-        inj[injLocations] = hinj
-        print injLocations
-        # inject
-        for i in range(0, ninj):
-            loc  = injLocations[i]
-            self.data[self.instNames[loc]] += sim[i]
-
-        # update y vector for regressions  
-        self.y = self.data.div(self.sg, axis=0)
-        self.hasinjections = True
-        self.hinj = inj
-        
-        print '%(injkind)s signal injected.' % locals()
-        

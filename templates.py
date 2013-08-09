@@ -97,7 +97,7 @@ class Source(object):
         f.close()
 
         # Load and create DataFrame
-        psr = pd.read_table(paths.textfromATNF, sep='\s+', comment='*', names= paramNames, header=None, skiprows=1, index_col=1)
+        psr = pd.read_table(paths.textfromATNF, sep='\s+', comment='*', names=sd.paramNames, header=None, skiprows=1, index_col=1)
         psrcat=psr.drop("#", axis=1)
     
         # Format
@@ -107,7 +107,7 @@ class Source(object):
         psrcat['DEC'] = psrcat['DEC'].map(formatDEC)
     
         #Check extra parameters
-        extra = pd.read_table(paths.psrextra, sep=',', header=None, index_col=[0], names=extraParamNames)
+        extra = pd.read_table(paths.psrextra, sep=',', header=None, index_col=[0], names=sd.extraParamNames)
         psrcatComplete = pd.merge(psrcat,extra, left_index=True, right_index=True, how='outer')
     
         psrcatComplete['POL error']=psrcatComplete['POL error'].fillna(value=np.pi/4.)
@@ -541,7 +541,7 @@ class Signal(object):
             info['p']['br'] = p + pdif_s
             
         else:
-            print 'Warning: %s is not a recognized template (temp 541)'
+            print 'Warning: %s is not a recognized template (temp 544)'
             exit()
             
         return info
@@ -573,8 +573,9 @@ class Signal(object):
             dm = pd.DataFrame(dmDict).dropna(axis=1) # DF cols: comp. names, index: t.
         
         return dm
+         
             
-    def simulate(self, pol_angle, incl_angle, h_scalar=0, pdif_scalar=0):
+    def simulate(self, pol_angle, incl_angle, phase=0, h_scalar=0, pdif_scalar=0):
         '''
         Simulates a signal based given polarization and inclination angles.
         Warning: Does not scale output signal, need to multiply output by h0.
@@ -587,7 +588,7 @@ class Signal(object):
             dm = self.design_matrix(pol_angle, incl_angle, h_scalar=h_scalar)
             
             # get phase info
-            info = self.signalinfo(self.pdif, iota=0, pdif_s=pdif_scalar)
+            info = self.signalinfo(self.pdif, iota=0, p=phase, pdif_s=pdif_scalar)
             
             # raise phases to exponent (apply),
             # multiply amplitudes and phases (mul),

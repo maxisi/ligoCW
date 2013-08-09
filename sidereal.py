@@ -157,4 +157,12 @@ def phase(p):
     else:
         return p
         
-
+def phase2(pinj):
+    if pinj == np.pi/2.:
+        return 'p'
+    elif pinj == -np.pi/2.:
+        return 'm'
+    elif pinj == 0:
+        return '0'
+    else:
+        return str(pinj)
