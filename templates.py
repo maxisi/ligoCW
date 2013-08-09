@@ -8,6 +8,7 @@ from collections import namedtuple
 import sys, os
 from sys import argv, exit
 import copy
+from time import time
 
 import sidereal as sd
 import paths
@@ -215,39 +216,61 @@ class Detector(object):
         '''
         Returns arm vectors in Cartesian sidereal coordinates.
         '''
-        northPole = np.array([0, 0, 1])     # Earth center to North pole
+        print 'Creating detector vectors.'
+        northPole = pd.Series(np.array([0, 0, 1]), index=['x', 'y', 'z'])    # Earth center to North pole
+        
         lat = self.param.ix['lat']
         lon = self.param.ix['lon']
         x_east = self.param.ix['x_east']
         arm_ang = self.param.ix['arm_ang']
-        t = np.array([int(x) for x in self.t])
+        
+        coords = ['x', 'y', 'z']
+        
+        t = np.array(self.t).astype(int)
+
         length = self.nentries
 
         # Angle between detector and Aries (vernal equinox) at time t
         # fiducial GPS time t0=630763213 (12hUT1 1/1/2000, JD245154).
         # See http://aa.usno.navy.mil/faq/docs/GAST.php
-        offset = 67310.5484088*sd.w   # Aries-Greenwich angle at fiducial time (GMST)
-        th = np.add.outer(offset+sd.w*(t-630763213), lon) # (LMST) rows: t, columns: det
+        offset = 67310.5484088 * sd.w   # Aries-Greenwich angle at fiducial time (GMST)
+        lmst = offset + sd.w*(t-630763213) + lon # (LMST) rows: t, columns: det
+        th = pd.Series(lmst, index=t)
         
-        zenith = [np.cos(lat)*np.cos(th), np.cos(lat)*np.sin(th), np.tile(math.sin(lat),(length,1))]  # [[x0, ...], [y0, ...], [z0, ...]]
-        zenith /= np.sqrt(np.sum(np.array(zenith) ** 2., axis=0))
+        start = time()
+        z = {
+            'x' : np.cos(lat)*np.cos(th),
+            'y' : np.cos(lat)*np.sin(th),
+            'z' : pd.Series([math.sin(lat)]*len(t), index=t)
+            }  # [[x0, ...], [y0, ...], [z0, ...]]
+          
+        zenith = pd.DataFrame(z) # norm 1 already
+
+        lE = {ti: np.cross(northPole, zenith.ix[ti]) for ti in t}
+        localEast = pd.DataFrame(lE, index=coords)
+
+        lN = {ti: np.cross(zenith.ix[ti], localEast[ti]) for ti in t}
+        localNorth = pd.DataFrame(lN, index=coords)
         
-        localEast = np.cross(northPole,zenith, axisb=0)    # [[x, y, z], ...]
-#         localEast /= np.sqrt(np.sum(localEast ** 2, axis=1))[..., None]
         
-        localNorth = np.cross(zenith, localEast, axisa=0)   # [[x, y, z], ...]
+        xArm = math.cos(x_east)*localEast + math.sin(x_east)*localNorth
+        # normalize
+        x_2 = xArm ** 2
+        x_norm = x_2.sum(axis=0)
+        self.dx = xArm.T.div(x_norm, axis='index')
         
-        xArm = math.cos(x_east)*localEast+math.sin(x_east)*localNorth
-        xArm /= np.sqrt(np.sum(xArm ** 2., axis=1))[..., None]
-        self.dx = pd.DataFrame(xArm, index=t, columns= ['x', 'y', 'z'])
-        
-        perp_xz = np.cross(zenith, self.dx, axisa=0)
+        pxz = {ti: np.cross(zenith.ix[ti], self.dx.ix[ti]) for ti in t}
+        perp_xz = pd.DataFrame(pxz, index=coords)
         yArm = xArm*math.cos(arm_ang) + perp_xz*math.sin(arm_ang) # equals perp_xz when angle between arms is 90deg
-        yArm /= np.sqrt(np.sum(yArm ** 2, axis=1))[..., None]
-        self.dy = pd.DataFrame(yArm, index=t, columns= ['x', 'y', 'z'])
+        # normalize
+        y_2 = yArm ** 2
+        y_norm = y_2.sum(axis=0)
+        self.dy = yArm.T.div(y_norm, axis='index')
+
+        self.dz = sd.rE * zenith
         
-        dzT = pd.DataFrame(zenith, columns=t, index= ['x', 'y', 'z'])
-        self.dz = sd.rE * dzT.T
+        print time()-start
+        exit()
         
         try:
             f = pd.HDFStore(self.path, 'w')

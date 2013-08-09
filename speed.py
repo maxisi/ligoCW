@@ -7,8 +7,9 @@ import sys
 
 import paths
 import sidereal as sd
-from templates import Source, Detector
+import templates
 
+reload(templates)
 
 class EphemerisD(object):
 
@@ -274,8 +275,8 @@ class System(object):
         self.det = sd.detnames(detector)
         self.psr = psr
         
-        self.src = Source(psr)
-        self.obs = Detector(detector)
+        self.src = templates.Source(psr)
+        self.obs = templates.Detector(detector)
         
     def getroemer(self, t, c=sd.c):
         
@@ -390,8 +391,23 @@ class System(object):
     
         
     
-def fakedata(ndays, t0=630720013):
+def fakedata(ndays, scale=10**-21, t0=630720013):
     t = np.arange(t0, t0 + ndays*sd.ss, 1000*sd.periodLIGO)
-    d = [random.random()*10**-21 + 1j*random.random()*10**-21 for i in t]
+    d = [random.random()*scale + 1j*random.random()*scale for i in t]
     data = pd.Series(d, index=t)
     return data
+    
+
+class DataReduction(object):
+    def __init__(self, detector, psr, ndays, c_gw=sd.c):
+        # Detector and source
+        self.detector = detector
+        self.psr = psr
+        self.syst = System(detector, psr)
+        
+        # noise
+        self.noise = fakedata(ndays)
+        
+        # delays
+        self.t = self.noise.index
+        self.syst.getroemer(self.t, c=c_gw)
