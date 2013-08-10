@@ -63,7 +63,7 @@ psrextra = 'files/psrextra.txt'                 # polarization and inclination a
 psrlist = 'files/templates/psrlist.txt'         # names of PSR names to analyze
 
 # Analysis
-sigma = 'files/analysis/psrSegmentSigma'        # day-long standard deviation
+sigma = 'files/analysis/sigma/'        # day-long standard deviation
 results = 'files/analysis/results/'             # background h_rec and significance
 tmat = 'files/analysis/tmat'                    # basis transformation matrix
 

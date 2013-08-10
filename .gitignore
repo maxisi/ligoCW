@@ -33,11 +33,9 @@ files/background/
 files/templates/
 files/data/
 files/analysis/
+files/remote/
 plots/
 unused/
-.png
-files/data/ephemerides/DE200
-
-files/templates/vectors/detVec_LHO
-
-files/templates/vectors/detVec_LHO
+*.png
+*.pyc
+*.hdf5
