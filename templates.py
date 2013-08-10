@@ -245,33 +245,22 @@ class Detector(object):
             }  # [[x0, ...], [y0, ...], [z0, ...]]
           
         zenith = pd.DataFrame(z) # norm 1 already
-
-        lE = {ti: np.cross(northPole, zenith.ix[ti]) for ti in t}
-        localEast = pd.DataFrame(lE, index=coords)
-
-        lN = {ti: np.cross(zenith.ix[ti], localEast[ti]) for ti in t}
-        localNorth = pd.DataFrame(lN, index=coords)
         
+        z2 = [zenith['x'], zenith['y'], zenith['z']]
+
+        localEast = np.cross(northPole, z2 , axisb=0)
+        localNorth = np.cross(z2, localEast, axisa=0)   
         
         xArm = math.cos(x_east)*localEast + math.sin(x_east)*localNorth
-        # normalize
-        x_2 = xArm ** 2
-        x_norm = x_2.sum(axis=0)
-        self.dx = xArm.T.div(x_norm, axis='index')
-        
-        pxz = {ti: np.cross(zenith.ix[ti], self.dx.ix[ti]) for ti in t}
-        perp_xz = pd.DataFrame(pxz, index=coords)
-        yArm = xArm*math.cos(arm_ang) + perp_xz*math.sin(arm_ang) # equals perp_xz when angle between arms is 90deg
-        # normalize
-        y_2 = yArm ** 2
-        y_norm = y_2.sum(axis=0)
-        self.dy = yArm.T.div(y_norm, axis='index')
+        xArm /= np.sqrt(np.sum(xArm ** 2., axis=1))[..., None]
 
+        perp_xz = np.cross(zenith, xArm)
+        yArm = xArm*math.cos(arm_ang) + perp_xz*math.sin(arm_ang) # equals perp_xz when angle between arms is 90deg
+
+        self.dx = pd.DataFrame(xArm, index=t, columns= ['x', 'y', 'z'])
+        self.dy = pd.DataFrame(yArm, index=t, columns= ['x', 'y', 'z'])
         self.dz = sd.rE * zenith
-        
-        print time()-start
-        exit()
-        
+
         try:
             f = pd.HDFStore(self.path, 'w')
             f['dx'] = self.dx

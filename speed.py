@@ -156,13 +156,16 @@ class EphemerisD(object):
         except AttributeError:
             self.fileload()
             tDE = self.r.columns
-            
-        if all(tDE==self.t):
-            print 'All times present. ',
-        else:
-            print 'Interpolating ephemeris. ',
-            self.produce()
-        
+        try:  
+            if all(tDE==self.t):
+                print 'All times present. ',
+            else:
+                print 'Interpolating ephemeris. ',
+                self.produce()
+        except TypeError:
+                print 'Interpolating ephemeris. ',
+                self.produce()
+
         print 'Geocenter positions ready.'
 
 
@@ -387,8 +390,6 @@ class System(object):
             dE = IFTE_KM1 * (mjdtt - IFTE_MJD0)*86400.0 + IFTE_K * (correctionTT_Teph - IFTE_TEPH0);
     #     
         return dE
-
-    
         
     
 def fakedata(ndays, scale=10**-21, t0=630720013):
@@ -406,8 +407,10 @@ class DataReduction(object):
         self.syst = System(detector, psr)
         
         # noise
+        print 'Generating noise.'
         self.noise = fakedata(ndays)
         
         # delays
         self.t = self.noise.index
+        print 'Computing Roemer delay.'
         self.syst.getroemer(self.t, c=c_gw)
