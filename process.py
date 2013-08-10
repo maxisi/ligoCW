@@ -134,12 +134,11 @@ class Data(object):
             except KeyError:
                 # file is empty or is corrupted
                 self.imp(detector)
+            finally:
+                d.close()
         
         except IOError:
             self.imp()
-        
-        finally:
-            d.close()
                 
 
 class Background(object):
