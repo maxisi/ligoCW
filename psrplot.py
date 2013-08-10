@@ -81,7 +81,7 @@ def hinjlins(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
 
     plt.xlabel('$h_{inj}$')
     plt.ylabel('Linearized significance')
-    plt.ylim(ymax=3.0)#linsmax)
+    plt.ylim(ymax=linsmax)
     
     plt.legend(numpoints=1, loc=2)
 
