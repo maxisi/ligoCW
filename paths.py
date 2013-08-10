@@ -19,8 +19,6 @@ plots/
 '''
 import os
 
-from numpy import pi
-
 leafList = (
             'analysis/results/',
             'data/ephemerides/',
@@ -74,12 +72,3 @@ eph = 'files/remote/ephemerides/' #'usr/share/lalpulsar/'
 eph_local = 'files/data/ephemerides/'           # imported ephemerides in HDF5 format
 
 
-def pname(pinj):
-    if pinj== pi/2:
-        return 'p'
-    elif pinj==-pi/2:
-        return 'm'
-    elif pinj==0:
-        return '0'
-    else:
-        return str(pinj)

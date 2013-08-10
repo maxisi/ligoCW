@@ -1,13 +1,15 @@
 import pandas as pd
 import numpy as np
+import random
 import csv
 import os
 import sys
 
 import paths
 import sidereal as sd
-from templates import detnames, Source, Detector
+import templates
 
+reload(templates)
 
 class EphemerisD(object):
 
@@ -154,6 +156,113 @@ class EphemerisD(object):
         except AttributeError:
             self.fileload()
             tDE = self.r.columns
+
+        try:  
+            if set(tDE)==set(self.t):
+                print 'All times present. ',
+            else:
+                print 'Interpolating ephemeris. ',
+                self.produce()
+        except TypeError:
+                print 'Interpolating ephemeris (TypeError). ',
+                self.produce()
+
+        print 'Geocenter positions ready.'
+
+
+class EphemerisT(object):
+
+    def __init__(self, time, prename='te405_2000-2019.dat', extra_name=''):
+        self.originalName = prename                         # name of DE file
+        self.name = 'TE405'                                 # name of imported DE
+        self.step = 14400.0                                 # time step in originalDE
+        self.extra_name = extra_name  # e.g. PSRid          # adds name to interpolation
+        self.t = np.array([int(x) for x in time])
+        self.nentries = len(time)
+    
+        self.load()                                         # load geocenter locations
+        
+    def get(self):
+        '''
+        Load time ephemerides TE405 data file into DataFrame.
+        '''
+        
+        teF = pd.read_table(paths.eph + originalName, sep='\n', skiprows=17, header=None, names='T')
+        te = teF['T']
+        te.index = np.linspace(630720000, 630720000+14400*43890, 43890)
+
+        # store
+        try:
+            f = pd.HDFStore(paths.eph_local + self.originalName, 'w')
+            f['t'] = te
+            print 'Imported TE405.'
+        finally:
+            f.close()
+
+
+    def produce(self):
+        '''
+        Loads Earth ephemeris data and interpolates to obtain Earth SSB location for time.
+        '''
+            
+        # Try to load TE from HDF5. Generate file if necessary
+        try:
+            print '1'
+            f = pd.HDFStore(paths.eph_local + self.originalName, 'r')
+        except IOError:
+            print '2'
+            self.get()
+            f = pd.HDFStore(paths.eph_local + self.originalName, 'r')
+        finally:
+            print '3'
+            tE = f['t']
+            f.close()
+        
+        # Indices of closest TE times to arrival times
+        tEi = np.floor( (self.t - tE[0])/self.step )
+        
+        # Time selection from TE
+        self.tE = tE[tEi.astype(int)]
+        
+        try:
+            f = pd.HDFStore(paths.eph_local + self.name + self.extra_name, 'w')
+            f['t'] = self.tE
+            print 'Interpolation successful. ',
+        finally:
+            f.close()
+            
+            
+    def fileload(self):
+        '''
+        Tries to load interpolated files. Calls interpolation if this fails
+        '''
+        try:
+            f = pd.HDFStore(paths.eph_local + self.originalName + self.extra_name, 'r')
+            self.tE = f['t']
+            f.close()
+        except IOError:
+            # Interpolate positions (not loaded and failed to get file)
+            print 'Interpolating ephemeris. ',
+            self.produce()
+            
+            
+    def load(self):
+        '''
+        Loads interpolated SSB geocenter locations.
+        '''
+        # Check if the positions are loaded already
+        try:
+            self.tE
+        except AttributeError:
+            # Check if positions are stored in file
+            self.fileload()
+            
+        # Check data type
+        try:
+            tDE = self.r.columns
+        except AttributeError:
+            self.fileload()
+            tDE = self.r.columns
             
         if all(tDE==self.t):
             print 'All times present. ',
@@ -167,11 +276,11 @@ class EphemerisD(object):
 class System(object):
     def __init__(self, detector, psr):
         self.detector = detector
-        self.det = detnames(detector)
+        self.det = sd.detnames(detector)
         self.psr = psr
         
-        self.src = Source(psr)
-        self.obs = Detector(detector)
+        self.src = templates.Source(psr)
+        self.obs = templates.Detector(detector)
         
     def getroemer(self, t, c=sd.c):
         
@@ -189,7 +298,7 @@ class System(object):
         else:
             ephID = 405
         
-        eph = speed.EphemerisD(ephID, self.obs.t)
+        eph = EphemerisD(ephID, self.obs.t)
         
         # vector from SSB to detector
         r = r_d + eph.r.T
@@ -199,13 +308,16 @@ class System(object):
         
         self.roemer = rn/c
 
-    def einstein(tgps, t2=False):
+    def einstein(self, tgps, tdb=False):
         '''
-        Returns Einstein delay for a given GPS time.
+        Returns TCB - TT at a given arrival time. If tdb=True, returns TDB - TT instead
+        i.e. a scaled version of the TCB frame in which the mean drift relative to TT is
+        divided out (TEMPO2 doc).
+
         Stolen from XLALBarycenter
         '''
     
-        if not t2:  
+        if tdb:  
             jedtdt = -7300.5e0 + (tgps + 51.184)/8.64e4; 
             jt=jedtdt/3.6525e5; # converting to TEMPO expansion param Julian millenium, NOT Julian century
 
@@ -256,8 +368,10 @@ class System(object):
             )
         
         else:
+            eph = EphemerisT(tgps)
+            tE = eph.Te
             # assuming tgps is in fact the time ephemeris
-            deltaT = np.array(tgps.tolist())
+            deltaT = np.array(list(tE))
             tgps = np.array(tgps.index)
     
             IFTE_KM1 = 1.55051979176e-8
@@ -277,20 +391,35 @@ class System(object):
             dE = IFTE_KM1 * (mjdtt - IFTE_MJD0)*86400.0 + IFTE_K * (correctionTT_Teph - IFTE_TEPH0);
     #     
         return dE
-
-
-
-def importTE(fname='te405_2000-2019.dat'):
-    te = pd.read_table(paths.eph + fname, skiprows=17, header=None, names='T')
-    te = te['T']
-    te.index = np.linspace(630720000, 630720000+14400*43890, 43890)
-    return te
-    
         
     
-def fakedata(ndays, t0=0):
-    t = range(t0, t0 + ndays*ss.dd, ss.periodLIGO)
-    d = [np.random.random + j*np.random.random for i in t]
-    
+def fakedata(ndays, scale=10**-21, t0=630720013):
+    t = np.arange(t0, t0 + ndays*sd.ss, 1000*sd.periodLIGO).astype(int)
+    d = [random.random()*scale + for i in t]
     data = pd.Series(d, index=t)
     return data
+    
+
+class DataReduction(object):
+    def __init__(self, detector, psr, ndays, c_gw=sd.c):
+        # Detector and source
+        self.detector = detector
+        self.psr = psr
+        self.syst = System(detector, psr)
+        
+        # noise
+        print 'Generating noise.'
+        self.noise = fakedata(ndays)
+        
+        # delays
+        self.t = self.noise.index
+        print 'Computing Roemer delay.'
+        self.syst.getroemer(self.t, c=c_gw)
+        
+        # signal
+        print 'Composing signal.'
+        s = templates.Signal(self.detector, self.psr, 'GR', 'p', self.t)
+        self.h = s.simulate(self.syst.src.param['POL'], self.syst.src.param['INC'])
+        
+        print 'Adding signal to noise.'
+        self.s = self.h + self.noise
