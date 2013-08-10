@@ -323,7 +323,8 @@ class InjSearch(object):
         
         self.t = self.background.seed.finehet.index
         
-        self.sg = 2 * getsigma(self.background.seed.finehet, self.psr)
+        sigma = Sigma(self.detector, self.psr, self.background.seed.finehet)
+        self.sg = 2 * sigma.std
         
         # injection info
         inj = np.linspace(hinjrange[0], hinjrange[1], ninj)
@@ -426,53 +427,84 @@ class InjSearch(object):
 
 
 ## SEARCH
-def segmentsigma(data):
-    '''
-    Splits data into day-long segments and returns their standard deviation.
-    '''
-    # Check orientation    
-    t = data.index
-    interval_length= sd.ss # ADJUST!
-    print 'Taking std over %f second-long intervals:' % interval_length,
-
-    # Slice up data into day-long bins and get groupby stats (see Ch 9 of Python for Data Analysis).
-    bins = np.arange(t[0]-interval_length, t[-1]+interval_length, interval_length)
-    slices = pd.cut(t, bins, right=False)
-    print 'sliced,',
-
-    def getsigma(group):
-#         s = np.std(group)
-        g = np.array(group.tolist())
-        s = np.std(g)
-        return s
-        #return group.std(ddof=0) # this is pd unbiased 1/(n-1), should use np.std 1/n?
+class Sigma(object):
+    def __init__(self, detector, psr, data):
+        self.detector = detector
+        self.psr = psr
         
-    print 'std taken,',
-    grouped = data.groupby(slices) # groups by bin
-    sigmagroups= grouped.apply(getsigma) # gets std for each bin
-    print 'grouped,',
+        self.data =  data
+        
+        self.dir = paths.sigma + '/' + self.detector + '/'
+        self.name = 'segsigma_' + self.psr + '_' + self.detector
+        self.path = self.dir + self.name
+        
+        self.get()
+        
+    def create(self):
+        '''
+        Splits data into day-long segments and returns their standard deviation.
+        '''
+        
+        data  = self.data
+        
+        # Check orientation    
+        t = data.index
+        interval_length= sd.ss
+        print 'Taking std over %f second-long intervals:' % interval_length,
 
-    # Create standard deviation time series 
-    s = [sigmagroups.ix[slices.labels[t_index]] for t_index in range(0,len(t)) ]
-    sigma = pd.Series(s, index=t)
-    print 'done.'
+        # Slice up data into day-long bins and get groupby stats (see Ch 9 of Python for Data Analysis).
+        bins = np.arange(t[0]-interval_length, t[-1]+interval_length, interval_length)
+        slices = pd.cut(t, bins, right=False)
+        print 'sliced,',
+
+        def getsigma(group):
+    #         s = np.std(group)
+            g = np.array(group.tolist())
+            s = np.std(g)
+            return s
+            #return group.std(ddof=0) # this is pd unbiased 1/(n-1), should use np.std 1/n?
+        
+        print 'std taken,',
+        grouped = data.groupby(slices) # groups by bin
+        sigmagroups= grouped.apply(getsigma) # gets std for each bin
+        print 'grouped,',
+
+        # Create standard deviation time series 
+        s = [sigmagroups.ix[slices.labels[t_index]] for t_index in range(0,len(t)) ]
+        self.std = pd.Series(s, index=t)
+        print 'done.'
     
-    return sigma
     
-    
-def getsigma(d, psr):
-    print 'Retrieving segment standard deviation for PSR %(psr)s...' % locals(),
-    try:
-        s = pd.HDFStore(paths.sigma)
+    def get(self):
+        print 'Retrieving segment standard deviation...' % locals(),
         try:
-            sigma = s[psr]
-
-        except KeyError:
-            print 'PSR not in file.'
-            sigma = segmentsigma(d)
-            s[psr] = sigma
-    finally:
-        s.close()
+            s = pd.HDFStore(self.path)
+            try:
+                self.std = s[self.psr]
+                
+                # check times coincide
+                if not set(self.std.index)==set(self.data.index):
+                    self.create()
+                    # save
+                    s.close()
+                    s = pd.HDFStore(self.path, 'w')
+                    s[self.psr] = self.std
+                    
+            except KeyError:
+                print 'PSR not in file.',
+                self.create()
+                # save
+                s[self.psr] = self.std
+                
+        except IOError:
+            print 'Creating std directory.',
+            os.makedirs(self.dir)
+            self.create()
+            # save
+            s = pd.HDFStore(self.path, 'w')
+            s[self.psr] = self.std
+            
+        finally:
+            s.close()
         
-    print 'Sigma is ready.'
-    return sigma
+        print 'Sigma is ready.'
