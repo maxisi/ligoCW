@@ -156,14 +156,15 @@ class EphemerisD(object):
         except AttributeError:
             self.fileload()
             tDE = self.r.columns
+
         try:  
-            if all(tDE==self.t):
+            if set(tDE)==set(self.t):
                 print 'All times present. ',
             else:
                 print 'Interpolating ephemeris. ',
                 self.produce()
         except TypeError:
-                print 'Interpolating ephemeris. ',
+                print 'Interpolating ephemeris (TypeError). ',
                 self.produce()
 
         print 'Geocenter positions ready.'
@@ -393,8 +394,8 @@ class System(object):
         
     
 def fakedata(ndays, scale=10**-21, t0=630720013):
-    t = np.arange(t0, t0 + ndays*sd.ss, 1000*sd.periodLIGO)
-    d = [random.random()*scale + 1j*random.random()*scale for i in t]
+    t = np.arange(t0, t0 + ndays*sd.ss, 1000*sd.periodLIGO).astype(int)
+    d = [random.random()*scale + for i in t]
     data = pd.Series(d, index=t)
     return data
     
@@ -414,3 +415,11 @@ class DataReduction(object):
         self.t = self.noise.index
         print 'Computing Roemer delay.'
         self.syst.getroemer(self.t, c=c_gw)
+        
+        # signal
+        print 'Composing signal.'
+        s = templates.Signal(self.detector, self.psr, 'GR', 'p', self.t)
+        self.h = s.simulate(self.syst.src.param['POL'], self.syst.src.param['INC'])
+        
+        print 'Adding signal to noise.'
+        self.s = self.h + self.noise

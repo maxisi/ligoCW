@@ -203,14 +203,14 @@ class Detector(object):
         except AttributeError:
             self.fileload()
         
-        try:
-            if all(self.dx.index.tolist()==self.t):
-                # All times present.
-                pass
-            else:
-                self.createVectors()
-        except TypeError:
+#         try:
+        if set(self.dx.index)==set(self.t):
+            # All times present.
+            pass
+        else:
             self.createVectors()
+#         except TypeError:
+#             self.createVectors()
 
     def createVectors(self):
         '''
@@ -251,11 +251,11 @@ class Detector(object):
         localEast = np.cross(northPole, z2 , axisb=0)
         localNorth = np.cross(z2, localEast, axisa=0)   
         
-        xArm = math.cos(x_east)*localEast + math.sin(x_east)*localNorth
+        xArm = np.cos(x_east)*localEast + np.sin(x_east)*localNorth
         xArm /= np.sqrt(np.sum(xArm ** 2., axis=1))[..., None]
 
         perp_xz = np.cross(zenith, xArm)
-        yArm = xArm*math.cos(arm_ang) + perp_xz*math.sin(arm_ang) # equals perp_xz when angle between arms is 90deg
+        yArm = xArm*np.cos(arm_ang) + perp_xz*np.sin(arm_ang) # equals perp_xz when angle between arms is 90deg
 
         self.dx = pd.DataFrame(xArm, index=t, columns= ['x', 'y', 'z'])
         self.dy = pd.DataFrame(yArm, index=t, columns= ['x', 'y', 'z'])
@@ -291,14 +291,14 @@ class Polarizations(object):
         
             pairName = pair[0] + pair[1]    # 'wxdx' = ('wx','dx')[0] + ('wx','dx')[1]
             
-            # check if product already defined. vars(self).keys() is list of variables
-            if pairName not in vars(self).keys():
+            # check if product is already defined.
+            if pairName not in dir(self):
             
                 # get vectors
                 v0 = getattr(self.vec, pair[0])     # v0 = self.vec.wx
                 v1 = getattr(self.vec, pair[1])     # v1 = self.vec.dx
                 
-                # dot product (mind the order! detector must always be v1 to broadcast)
+                # dot product (mind the order! v1 MUST be detector vector to broadcast)
                 setattr(self, pairName, v1.mul(v0, axis='columns').sum(axis=1))
     
     # tensor
@@ -410,7 +410,7 @@ class Response(object):
         wyRot = self.src.wx*np.cos(self.psi) + self.src.wy*np.sin(self.psi) 
         
         # Package vectors
-        vecs = Vectors(self.obs.dx, self.obs.dy, self.src.wx, self.src.wy, self.src.wz)      
+        vecs = Vectors(self.obs.dx, self.obs.dy, wxRot, wyRot, self.src.wz)      
            
         # Get polarizations
         pols = Polarizations(vecs)
@@ -478,19 +478,6 @@ class Response(object):
         sio.savemat('%(paths.ap)scrab_py' % locals(), p)
 
 
-class System(object):
-    def __init__(self, detector, psr):
-        self.detector = detector
-        self.det = sd.sd.detnames(detector)
-        self.psr = psr
-        
-        self.src = Source(psr)
-        self.obs = Detector(detector)
-        
-    def interact(self, t, kinds):
-        self.response = Response(self.psr, self.detector, t, kinds)
-        self.response.get()        
-       
 ###      
         
 ## SIMULATE            

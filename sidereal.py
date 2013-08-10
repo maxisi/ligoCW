@@ -61,14 +61,14 @@ detectors = pd.DataFrame({
                 'lat': 0.8107054375513661,
                 'lon': -2.084097659806429,
                 'x_east': 2.199114857512855,
-                'arm_ang': np.pi/2
+                'arm_ang': np.pi/2.
                 },
     
         'LLO': {
                 'lat': 0.5333726194094671, 
                 'lon': -1.584235362035253,
                 'x_east': 3.4505159311927893,
-                'arm_ang': np.pi/2
+                'arm_ang': np.pi/2.
                 },
     
         'GEO': {
