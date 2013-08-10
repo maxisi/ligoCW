@@ -29,11 +29,7 @@ Thumbs.db
 
 # Data #
 ######################
-files/background/
-files/templates/
-files/data/
-files/analysis/
-files/remote/
+files/
 plots/
 unused/
 *.png
