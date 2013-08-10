@@ -293,7 +293,7 @@ class Results(object):
         
         plt.title(header)
         
-        pltdir = 'plots/' + self.detector + '/' + self.kind + '/' + pltType + '/'
+        pltdir = paths.plots + self.detector + '/' + self.kind + '/' + pltType + '/'
         pltname = self.detector + '_' + self.kind + '_' + sd.phase2(self.pdif) + '_' + pltType + extra_name
         save_to = pltdir + pltname
         

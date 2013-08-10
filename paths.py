@@ -14,7 +14,7 @@ files/
     remote/
         source/
         ephemerides/
-plots/
+    plots/
         
 '''
 import os
@@ -24,7 +24,8 @@ leafList = (
             'data/ephemerides/',
             'background/',
             'templates/antennapatterns',
-            'templates/vectors'
+            'templates/vectors',
+            'plots/'
             )
             
 def makestructure():
@@ -36,12 +37,6 @@ def makestructure():
             print dir
         except OSError:
             print 'Error: files/%(dir)s already exists' % locals()
-    # create plots/
-    try:
-        os.mkdir('plots/')
-        print 'plots/'
-    except OSError:
-        print 'Error: plots/ already exists'
 
 
 # Antenna patterns
@@ -59,7 +54,7 @@ vectors = 'files/templates/vectors/'            # detector and wave vectors
 # Source
 textfromATNF = 'files/templates/psrcat.txt'     # download from ATNF
 psrcat = 'files/templates/pulsar_catalogue'     # pulsar data in DF
-psrextra = 'files/psrextra.txt'                 # polarization and inclination angles
+psrextra = 'psrextra.txt'                 # polarization and inclination angles
 psrlist = 'files/templates/psrlist.txt'         # names of PSR names to analyze
 
 # Analysis
@@ -71,4 +66,6 @@ tmat = 'files/analysis/tmat'                    # basis transformation matrix
 eph = 'files/remote/ephemerides/' #'usr/share/lalpulsar/'
 eph_local = 'files/data/ephemerides/'           # imported ephemerides in HDF5 format
 
+# Plots
+plots = 'files/plots/'
 
