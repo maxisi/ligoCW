@@ -33,6 +33,7 @@ files/background/
 files/templates/
 files/data/
 files/analysis/
+plots/
 unused/
 .png
 files/data/ephemerides/DE200
