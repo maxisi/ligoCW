@@ -222,10 +222,6 @@ class Background(object):
         except IOError:
             # no log found
             self.create()
-# 
-#         files = [name for name in os.listdir(paths.rhB) if self.det in name]
-#         
-#         return files
 
 
 class Results(object):
@@ -428,7 +424,7 @@ class InjSearch(object):
 
 ## SEARCH
 class Sigma(object):
-    def __init__(self, detector, psr, data):
+    def __init__(self, detector, psr, data, justload=False):
         self.detector = detector
         self.psr = psr
         
@@ -437,6 +433,8 @@ class Sigma(object):
         self.dir = paths.sigma + '/' + self.detector + '/'
         self.name = 'segsigma_' + self.psr + '_' + self.detector
         self.path = self.dir + self.name
+        
+        self.justload = justload
         
         self.get()
         
@@ -483,12 +481,13 @@ class Sigma(object):
                 self.std = s[self.psr]
                 
                 # check times coincide
-                if not set(self.std.index)==set(self.data.index):
-                    self.create()
-                    # save
-                    s.close()
-                    s = pd.HDFStore(self.path, 'w')
-                    s[self.psr] = self.std
+                if not self.justload:
+                    if not set(self.std.index)==set(self.data.index):
+                        self.create()
+                        # save
+                        s.close()
+                        s = pd.HDFStore(self.path, 'w')
+                        s[self.psr] = self.std
                     
             except KeyError:
                 print 'PSR not in file.',
@@ -508,3 +507,19 @@ class Sigma(object):
             s.close()
         
         print 'Sigma is ready.'
+        
+    def plot(self, extra_name=''):
+        
+        self.std.plot(style='+')
+        plt.title('Daily standard deviation for ' + self.detector + ' ' + self.psr + ' data ' + extra_name)
+        plt.xlabel('GPS time (s)')
+        plt.ylabel('$\sigma$')
+        
+        # save
+        save_dir = paths.plots + '/' + self.detector + '/sigma/'
+        save_name = self.name + extra_name + '.png'
+        try:
+            plt.savefig(save_dir + save_name, bbox_inches='tight')
+        except IOError:
+            os.makedirs(save_dir)
+            plt.savefig(save_dir + save_name, bbox_inches='tight')
