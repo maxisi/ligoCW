@@ -536,22 +536,22 @@ class Signal(object):
 
         # set amplitudes and phases
         if self.kind == 'GR':
-            info['h']['pl'] = (1. + math.cos(iota)**2)/2.
-            info['h']['cr'] = math.cos(iota)
+            info['h']['pl'] = (1. + np.cos(iota)**2)/2.
+            info['h']['cr'] = np.cos(iota)
             
             info['p']['pl'] = p
             info['p']['cr'] = p + pdif
             
         elif self.kind == 'G4v':
-            info['h']['xz'] = math.sin(iota)
-            info['h']['yz'] = math.sin(iota) * math.cos(iota)
+            info['h']['xz'] = np.sin(iota)
+            info['h']['yz'] = np.sin(iota) * math.cos(iota)
             
             info['p']['xz'] = p
             info['p']['yz'] = p + pdif
 
         elif self.kind == 'GRs':
-            info['h']['pl'] = (1. + math.cos(iota)**2)/2.
-            info['h']['cr'] = math.cos(iota)
+            info['h']['pl'] = (1. + np.cos(iota)**2)/2.
+            info['h']['cr'] = np.cos(iota)
             info['h']['br'] = h_s
             
             info['p']['pl'] = p
@@ -604,7 +604,7 @@ class Signal(object):
         else:
             # form design matrix
             dm = self.design_matrix(pol_angle, incl_angle, h_scalar=h_scalar)
-            
+
             # get phase info
             info = self.signalinfo(self.pdif, iota=0, p=phase, pdif_s=pdif_scalar)
             
@@ -612,8 +612,9 @@ class Signal(object):
             # multiply amplitudes and phases (mul),
             # drop extra columns which come in from phases (dropna),
             # add up columns (sum).
-            s = dm.mul(info['p'].apply(math.exp)).dropna(axis=1).sum(axis=1)
-            
+            raisePhi = lambda x: np.exp(2.*np.pi*1j*x)
+            s = dm.mul(info['p'].map(raisePhi)).dropna(axis=1).sum(axis=1)
+
             # multiply signal by strengths 
 #             s = pd.DataFrame(np.multiply.outer(s, h0), index=s.index)
             return s
