@@ -17,8 +17,7 @@ c = 299792458.              # Speed of light (m/s)
 
 # CONVERSIONS
 def hmsformat(*args):
-    
-    if len(args) == 1:
+    if len(args[0]) == 1:
         # Assume hh:mm:ss format
         if type(args) != str:
             argument = args[0][0]
@@ -28,8 +27,8 @@ def hmsformat(*args):
         hms = argument.split(':')
         h, m, s = [float(x) for x in hms]
         
-    elif len(args) == 3:
-        h, m, s = [x for x in args]
+    elif len(args[0]) == 3:
+        h, m, s = [x for x in args[0]]
     else:
         print 'ERROR in hmsformat: can\'t take %d arguments' % len(args)    
     return h, m, s
@@ -47,10 +46,41 @@ def dms_deg(*args):
     d, m, s = hmsformat(args)
     return d + m/60 + s/(60**2)
     
+def masyr_rads(masyr):
+    # Converts milliarcseconds/yr to radians/second
+    asyr = masyr * 10 ** -3                     # mas/yr to arcseconds/yr 
+    radyr = asyr * np.pi / 648000.              # as/yr to rad/yr (Wikipedia)
+    rads = radyr / ss                           # rad/yr to rad/s
+    return rads
+    
+def mjd_gps(mjd):
+    # Converts MJD time to GPS time (taken from LALBarycenter.c line 749)
+    tgps = 86400.*(mjd - 44244.) - 51.184
+    return tgps
+    
+    
 ###
 
 # PULSAR PARAMETERS
-paramNames = ['#', None, 'RAS', 'RAS error', 'DEC', 'DEC error']
+paramNames = [
+                '#',
+                None,
+                'RAS',
+                'RAS error',
+                'DEC',
+                'DEC error',
+                'PMRAS',
+                'PMRAS error',
+                'PMDEC',
+                'PMDEC error',
+                'POSEPOCH',
+                'F0',
+                'F0 error',
+                'F1',
+                'F1 error',
+                'F2',
+                'F2 error']
+                
 extraParamNames = [None, 'POL', 'POL error', 'INC', 'INC error']
 
 ###

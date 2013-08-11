@@ -54,7 +54,7 @@ vectors = 'files/templates/vectors/'            # detector and wave vectors
 # Source
 textfromATNF = 'files/templates/psrcat.txt'     # download from ATNF
 psrcat = 'files/templates/pulsar_catalogue'     # pulsar data in DF
-psrextra = 'psrextra.txt'                 # polarization and inclination angles
+psrextra = 'config/psrextra.txt'                 # polarization and inclination angles
 psrlist = 'files/templates/psrlist.txt'         # names of PSR names to analyze
 
 # Analysis
