@@ -397,27 +397,28 @@ class InjSearch(object):
                     designMatrix = search[m].design_matrix(psi, iota)
                     
                     A = designMatrix.div(self.sg, axis=0)
-                    b = d / self.sg
 
+                    b = d / self.sg
+                    
                     # SVD DECOMPOSITION
                     svd = np.linalg.svd(A, full_matrices=False)
-
-                    U = pd.DataFrame(svd[0], index=b.index)
-                    W = pd.DataFrame(np.diag(1/svd[1]))
-                    V = pd.DataFrame(svd[2]) 
-
-                    cov = V.dot( V.T.dot( W**2))
-
+                    
+                    U = pd.DataFrame(svd[0], columns=A.columns, index=A.index)
+                    W = pd.DataFrame(np.diag(1./svd[1]), index=A.columns, columns=A.columns)
+                    V = pd.DataFrame(svd[2], index=A.columns, columns=A.columns)
+                    
+                    cov = V.T.dot(W**2).dot(V)  # covariance matrix
+                    
                     VtW = V.T.dot(W)
                     # need to make U complex before dotting with b
-                    Uc = U + 0j
-                    Utb = Uc.mul(b, axis=0).sum(axis=0)
-                    
-                    a = VtW.dot(Utb.T)
-                    
-                    self.results.h[m][inst_number] = (abs(a[0]) + abs(a[1])) / 2.
-                    self.results.s[m][inst_number] = abs(np.dot(np.conj(a).T, np.linalg.solve(cov, a)))
-                    
+                    Utb = (U + 0j).mul(b, axis=0).sum(axis=0)
+                    a = VtW.dot(Utb.T)          # results
+
+                    # average h0
+                    self.results.h[m][inst_number] = (abs(a).sum()) / len(a)
+                    # significance
+                    self.results.s[m][inst_number] = abs(np.dot(a.conj(), np.linalg.solve(cov, a)))
+
         ## Save
         self.results.save()
 
