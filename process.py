@@ -7,6 +7,7 @@ from time import time
 import numpy as np
 import pandas as pd
 import random
+import math
 
 import templates
 import sidereal as sd
@@ -224,6 +225,7 @@ class Background(object):
             self.create()
 
 
+
 class Results(object):
     '''
     Holds search results and contains methods to save them.
@@ -246,6 +248,19 @@ class Results(object):
         self.h = pd.DataFrame(columns = methods, index=range(len(hinj)))
         self.s = pd.DataFrame(columns = methods, index=range(len(hinj)))
         
+        # stats
+        statkinds = [
+                    'lin s slope',
+                    'lin s noise',
+                    'lin s inter',
+                    'h rec slope',
+                    'h rec noise',
+                    'h rec inter',
+                    'min inj det'
+                    ]
+                    
+        self.stats = pd.DataFrame(index=statkinds, columns = methods)
+        
         # saving
         self.dir = paths.results + self.detector + '/' + self.psr + '/' 
         self.name = self.psr + '_' + self.detector + '_' + self.kind + '_' + sd.phase2(pdif)
@@ -258,6 +273,8 @@ class Results(object):
         self.h.index = self.hinj
         self.s.index = self.hinj
         
+        self.getstats()
+       
         try:
             os.makedirs(self.dir)
         except OSError:
@@ -267,6 +284,7 @@ class Results(object):
             f = pd.HDFStore(self.path, 'w')
             f['h'] = self.h
             f['s'] = self.s
+            f['stats']= self.stats
         finally:
             f.close()
             
@@ -281,8 +299,9 @@ class Results(object):
         finally:
             f.close()            
 
-    def plots(self, pltType, extra_name=''):
 
+    def plots(self, pltType, extra_name=''):
+        
         header = self.kind + sd.phase2(self.pdif) + ' injections on ' + self.detector + ' data for ' + self.psr + ' ' + extra_name
           
         getattr(psrplot, pltType)(hinj=self.h.index, hrec=self.h, s=self.s, methods=self.methods)
@@ -302,7 +321,21 @@ class Results(object):
         plt.close()
         
         print 'Plot saved to:\n %(save_to)s' % locals()
+    
         
+    def getstats(self, plot=False, store=True):
+        
+        lins = self.s.applymap(math.sqrt)
+        
+        for m in self.methods:
+            self.stats[m]['min inj det'] = psrplot.min_det_h(lins[m])
+            self.stats[m]['lin s slope'] = psrplot.lin_fit(lins[m])(1)
+            self.stats[m]['lin s noise'] = psrplot.noise_line(lins[m])(1)
+            self.stats[m]['lin s inter'] = psrplot.fit_intersect_noise(lins[m])
+            self.stats[m]['h rec noise'] = psrplot.noise_line(self.h[m])(1)
+            self.stats[m]['h rec slope'] = psrplot.lin_fit(self.h[m])(1)
+            self.stats[m]['h rec inter'] = psrplot.fit_intersect_noise(self.h[m])
+                    
 
 class InjSearch(object):
     
@@ -378,7 +411,7 @@ class InjSearch(object):
 
                 psi_inj  = random.uniform(self.pol_range[0], self.pol_range[1])
                 iota_inj = random.uniform(self.inc_range[0], self.inc_range[1])
-                phi0 = 0#random.uniform(0., np.pi/2.)                    
+                phi0 = 0.#random.uniform(0., np.pi/2.)                    
 
                 print psi, iota, phi0
                 # loop over search methods
@@ -390,7 +423,8 @@ class InjSearch(object):
                     # inject if necessary
                     h = self.hinj[inst_number]
                     if h != 0:
-                        print 'I!',
+                        print self.injection.kind + str(self.injection.pdif),
+                        print 'I! %(psi_inj)f %(iota_inj)f %(phi0)f' % locals()
                         d += h * self.injection.simulate(psi_inj, iota_inj, phase=phi0)
                     
                     # get design matrix

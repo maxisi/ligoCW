@@ -524,10 +524,10 @@ class Signal(object):
         self.response = Response(psr, detector, t, kind, loadvectors=True)
         
     
-    def signalinfo(self, pdif, iota=False, p=0, h_s=0, pdif_s=0):
+    def signalinfo(self, pdif, iota=[], p=0, h_s=0, pdif_s=0):
         
         # determine inclination angle
-        if not iota:
+        if iota==[]:
             # no preset iota, take default
             iota = self.response.src.param['INC']
 
@@ -553,7 +553,7 @@ class Signal(object):
             info['h']['pl'] = (1. + np.cos(iota)**2)/2.
             info['h']['cr'] = np.cos(iota)
             info['h']['br'] = h_s
-            
+          
             info['p']['pl'] = p
             info['p']['cr'] = p + pdif
             info['p']['br'] = p + pdif_s
@@ -570,8 +570,9 @@ class Signal(object):
         if self.kind=='Sid':
             # no need to get antenna patterns
             # build basis set:
-            th = pd.Series(sd.w * self.t, index=self.t)
-            basis = [math.cos(th), math.cos(2.*th), math.sin(th), math.sin(2.*th)]
+            th = pd.Series(sd.w * np.array(self.t), index=self.t)
+            
+            basis = [th.map(np.cos), (2.*th).map(np.cos), th.map(np.sin), (2.*th).map(np.sin)]
             
             # construct matrix
             dm = pd.concat(basis, axis=1, keys=['cos1', 'cos2', 'sin1', 'sin2'])
@@ -587,7 +588,7 @@ class Signal(object):
             info = self.signalinfo(0, iota=incl_angle, h_s=h_scalar)
             
             # construct matrix
-            dmDict = {pol: getattr(response_local, pol) * info['h'][pol]/2. for pol in self.basis}
+            dmDict = {pol: getattr(response_local, pol) * info['h'][pol] / 2. for pol in self.basis}
             dm = pd.DataFrame(dmDict).dropna(axis=1) # DF cols: comp. names, index: t.
         
         return dm
@@ -606,7 +607,7 @@ class Signal(object):
             dm = self.design_matrix(pol_angle, incl_angle, h_scalar=h_scalar)
 
             # get phase info
-            info = self.signalinfo(self.pdif, iota=0, p=phase, pdif_s=pdif_scalar)
+            info = self.signalinfo(self.pdif, iota=1, p=phase, pdif_s=pdif_scalar)
             
             # raise phases to exponent (apply),
             # multiply amplitudes and phases (mul),
@@ -615,6 +616,4 @@ class Signal(object):
             raisePhi = lambda x: np.exp(2.*np.pi*1j*x)
             s = dm.mul(info['p'].map(raisePhi)).dropna(axis=1).sum(axis=1)
 
-            # multiply signal by strengths 
-#             s = pd.DataFrame(np.multiply.outer(s, h0), index=s.index)
             return s

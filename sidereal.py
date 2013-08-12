@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+from scipy import optimize
+
 
 # CONSTANTS
 ss = 86164.0905             # Seconds in a sidereal day
@@ -196,3 +198,14 @@ def phase2(pinj):
         return '0'
     else:
         return str(pinj)
+        
+        
+# PLOTS
+pltcolor = {
+            'GR' : 'c',
+            'G4v': 'm',
+            'AP' : 'b',
+            'Sid': 'c'
+            }
+            
+default_style = '+'

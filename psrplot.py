@@ -3,18 +3,68 @@ import pandas as pd
 import numpy as np
 import scipy.stats as stats
 import math
+import sidereal as sd
+from scipy.optimize import fsolve
 
 from sys import exit
 
-pltcolor = {
-            'GR' : 'c',
-            'G4v': 'm',
-            'AP' : 'b',
-            'Sid': 'c'
-            }
-            
-default_style = '+'
-            
+# AUXILIARY FUNCTIONS
+
+def lin_fit(lins):
+    # assuming input is a series
+    
+    # get injections
+    lins = lins.drop([0])
+    
+    # put vectors in proper shape
+    x = np.reshape(lins.index, (len(lins), 1))
+    y = np.reshape(lins, (len(lins), 1))
+    
+    # fit
+    p, _, _, _ = np.linalg.lstsq(x, y)
+    
+    return np.poly1d([p[0][0], 0])
+    
+        
+def noise_line(d):
+    # input can be a dataframe
+    # find elements with index 0 (no injection) and take their max over columns and rows
+    try:
+        max_n = d[0].max()
+    except KeyError:
+        max_n =d.T[0].max().max()
+    # return corresponding constant polynomial
+    return np.poly1d([max_n])
+
+
+def min_det_h(d):
+    # assumes input is a series
+    # get max noise
+    noise = noise_line(d)(1)
+    # find max injection below that
+    det_injs = d[d>noise]
+    try:
+        return det_injs.index[np.argmin(det_injs)]
+    except ValueError:
+        return 0
+
+    
+    
+def fit_intersect_noise(d):
+    # assumes input is a series
+    
+    noise = noise_line(d)       # noise line
+    fit = lin_fit(d)            # fit line
+    hdetmin = min_det_h(d)      # min detected h (probably around intersection)
+    
+    h_intersect = fsolve(lambda x: fit(x) - noise(x), hdetmin)
+    
+    return h_intersect[0]
+ 
+ 
+ 
+# PLOTTING FUNCTIONS
+           
 def p(hinj=[], hrec=[], s=[], psrname='', detname='', style=default_style, methods=[]):
         
     for method in methods:
@@ -39,7 +89,7 @@ def p(hinj=[], hrec=[], s=[], psrname='', detname='', style=default_style, metho
         pv = [1. - cdf/max(cumfreqs) for cdf in cumfreqs]
         bins = np.linspace(lowlim, num_bins*binsize, num_bins)
 
-        plt.plot(bins, pv, style, color=pltcolor[method], label=method)
+        plt.plot(bins, pv, style, color=sd.sd.pltcolor[method], label=method)
         
         plt.yscale('log')
 
@@ -62,7 +112,7 @@ def hinjs(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
     method_plot = plt.plot(hinj, s[methods], style)
         
     for i in range(0, len(method_plot)):
-        plt.setp(method_plot[i], color=pltcolor[methods[i]], label=methods[i])
+        plt.setp(method_plot[i], color=sd.pltcolor[methods[i]], label=methods[i])
 
     plt.xlabel('$h_{inj}$')
     plt.ylabel('Significance')
@@ -71,11 +121,25 @@ def hinjs(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
     
 
 def hinjlins(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
-
-    method_plot = plt.plot(hinj, s[methods].applymap(lambda x: np.sqrt(x)), style)
     
+    lins = s.applymap(math.sqrt)
+    
+    method_plot = plt.plot(hinj, lins[methods], style)
+    
+    slope = []
     for i in range(0, len(method_plot)):
-        plt.setp(method_plot[i], color=pltcolor[methods[i]], label=methods[i])
+        plt.setp(method_plot[i], color=sd.pltcolor[methods[i]], label=methods[i])
+        
+        # fit
+        line = lin_fit(lins[methods[i]])
+        slope += [line(1)]
+        # plot
+        plt.plot(s.index, line(s.index), ls='-',color=sd.pltcolor[methods[i]], linewidth=.05)
+
+    
+    # find noise for max slope line
+    n_line = noise_line(lins[methods[np.argmax(slope)]])
+    plt.plot(s.index, n_line(s.index), '--', color='.95')
     
     linsmax = max([np.amax(s[m].map(lambda x: np.sqrt(x))) for m in methods])
 
@@ -91,7 +155,7 @@ def hinjrec(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
     method_plot = plt.plot(hinj, hrec[methods], style)
     
     for i in range(0, len(method_plot)):
-        plt.setp(method_plot[i], color=pltcolor[methods[i]], label=methods[i])
+        plt.setp(method_plot[i], color=sd.pltcolor[methods[i]], label=methods[i])
 
     plt.legend(numpoints=1, loc=2)
 
@@ -114,7 +178,7 @@ def rec(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
     method_plot = plt.plot(h[methods], style)
     
     for i in range(0, len(method_plot)):
-        plt.setp(method_plot[i], color=pltcolor[methods[i]], label=methods[i])
+        plt.setp(method_plot[i], color=sd.pltcolor[methods[i]], label=methods[i])
 
     plt.ylabel('$h_{rec}$')
     plt.ylabel('Instantiations')
@@ -127,7 +191,7 @@ def sig(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
     method_plot = plt.plot(s[methods], style)
     
     for i in range(0, len(method_plot)):
-        plt.setp(method_plot[i], color=pltcolor[methods[i]], label=methods[i])
+        plt.setp(method_plot[i], color=sd.pltcolor[methods[i]], label=methods[i])
 
     plt.ylabel('$Significance$')
     plt.ylabel('Instantiations')
@@ -200,7 +264,7 @@ def p_original(detector, psr, location='files/remote/source/'):
     pv = [1. - cdf/max(cumfreqs) for cdf in cumfreqs]
     bins = np.linspace(lowlim, num_bins*binsize, num_bins)
 
-    plt.plot(bins, pv, style, color=pltcolor[method], label=method)
+    plt.plot(bins, pv, style, color=sd.pltcolor[method], label=method)
     
     plt.yscale('log')
 
