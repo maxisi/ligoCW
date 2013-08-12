@@ -21,6 +21,7 @@ import os
 
 leafList = (
             'analysis/results/',
+            'analysis/sigma/',
             'data/ephemerides/',
             'background/',
             'templates/antennapatterns',
