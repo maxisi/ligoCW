@@ -339,7 +339,7 @@ class Results(object):
 
 class InjSearch(object):
     
-    def __init__(self, detector, psr, nfreq, injkind, pdif, ninj, frange=[1.0e-7, 1.0e-5], hinjrange=[1.0E-27, 1.0E-24], filesize=100):
+    def __init__(self, detector, psr, nfreq, injkind, pdif, ninj, rangeparam=[], frange=[1.0e-7, 1.0e-5], hinjrange=[1.0E-27, 1.0E-24], filesize=100):
         # system info
         self.detector = detector
         self.psr = psr
@@ -368,15 +368,26 @@ class InjSearch(object):
         src = self.injection.response.src
 
         # range info
-        self.pol_range = [
-                        src.param['POL'],# - src.param['POL error'],
-                        src.param['POL'] #+ src.param['POL error']
-                        ]
+        if 'psi' in rangeparam or rangeparam=='all':
+            self.pol_range = [
+                            src.param['POL'] - src.param['POL error'],
+                            src.param['POL'] + src.param['POL error']
+                            ]
+        else:
+            self.pol_range = [src.param['POL'], src.param['POL']]
+        
+        if 'iota' in rangeparam or rangeparam=='all':   
+            self.inc_range = [
+                            src.param['INC'] - src.param['INC error'],
+                            src.param['INC'] + src.param['INC error']
+                            ]
+        else:
+            self.inc_range = [src.param['INC'], src.param['INC']]
 
-        self.inc_range = [
-                        src.param['INC'], #- src.param['INC error'],
-                        src.param['INC'] #+ src.param['INC error']
-                        ]
+        if 'phi0' in rangeparam or rangeparam=='all':                     
+            self.phi0_range = [0., np.pi/2]
+        else:
+            self.phi0_range = [0., 0.]
         
 
     def analyze(self, methods):
@@ -411,7 +422,7 @@ class InjSearch(object):
 
                 psi_inj  = random.uniform(self.pol_range[0], self.pol_range[1])
                 iota_inj = random.uniform(self.inc_range[0], self.inc_range[1])
-                phi0 = 0.#random.uniform(0., np.pi/2.)                    
+                phi0 = random.uniform(self.phi0_range[0], self.phi0_range[1])                    
 
                 print psi, iota, phi0
                 # loop over search methods
