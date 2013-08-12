@@ -353,7 +353,7 @@ class InjSearch(object):
         self.t = self.background.seed.finehet.index
         
         sigma = Sigma(self.detector, self.psr, self.background.seed.finehet)
-        self.sg = 2 * sigma.std
+        self.sg = np.sqrt(2) * sigma.std
         
         # injection info
         inj = np.linspace(hinjrange[0], hinjrange[1], ninj)
