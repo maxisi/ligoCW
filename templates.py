@@ -613,7 +613,7 @@ class Signal(object):
             # multiply amplitudes and phases (mul),
             # drop extra columns which come in from phases (dropna),
             # add up columns (sum).
-            raisePhi = lambda x: np.exp(2.*np.pi*1j*x)
+            raisePhi = lambda x: np.exp(1j*x)
             s = dm.mul(info['p'].map(raisePhi)).dropna(axis=1).sum(axis=1)
 
             return s
