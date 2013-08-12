@@ -65,7 +65,7 @@ def fit_intersect_noise(d):
  
 # PLOTTING FUNCTIONS
            
-def p(hinj=[], hrec=[], s=[], psrname='', detname='', style=default_style, methods=[]):
+def p(hinj=[], hrec=[], s=[], psrname='', detname='', style=sd.default_style, methods=[]):
         
     for method in methods:
         # First Calculate the interquartile range
@@ -107,7 +107,7 @@ def p(hinj=[], hrec=[], s=[], psrname='', detname='', style=default_style, metho
     
 
 # compound plots  
-def hinjs(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
+def hinjs(hinj=[], hrec=[], s=[], style=sd.default_style, methods=[]):
 
     method_plot = plt.plot(hinj, s[methods], style)
         
@@ -120,7 +120,7 @@ def hinjs(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
     plt.legend(numpoints=1, loc=2)
     
 
-def hinjlins(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
+def hinjlins(hinj=[], hrec=[], s=[], style=sd.default_style, methods=[]):
     
     lins = s.applymap(math.sqrt)
     
@@ -150,7 +150,7 @@ def hinjlins(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
     plt.legend(numpoints=1, loc=2)
 
 
-def hinjrec(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
+def hinjrec(hinj=[], hrec=[], s=[], style=sd.default_style, methods=[]):
 
     method_plot = plt.plot(hinj, hrec[methods], style)
     
@@ -167,13 +167,13 @@ def hinjrec(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
     
 
 # simple plots
-def inj(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
+def inj(hinj=[], hrec=[], s=[], style=sd.default_style, methods=[]):
     plt.plot(hinj, style)
     plt.ylabel('$h_{inj}$')
     plt.xlabel('Instantiation')
     
 
-def rec(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
+def rec(hinj=[], hrec=[], s=[], style=sd.default_style, methods=[]):
 
     method_plot = plt.plot(h[methods], style)
     
@@ -186,7 +186,7 @@ def rec(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
     plt.legend(numpoints=1)
     
 
-def sig(hinj=[], hrec=[], s=[], style=default_style, methods=[]):
+def sig(hinj=[], hrec=[], s=[], style=sd.default_style, methods=[]):
     
     method_plot = plt.plot(s[methods], style)
     
