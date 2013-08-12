@@ -284,13 +284,44 @@ class System(object):
         
     def getroemer(self, t, c=sd.c):
         
-        # unit vector pointing to source (opposite of source-SSB):
-        n = - self.src.wz
+        coords = ['x', 'y', 'z']
         
         # vector from geocenter to detector
         self.obs.t = np.array(t).astype(int)
         self.obs.loadVectors()
         r_d = self.obs.dz
+        
+        # unit vector pointing to source (opposite of source-SSB):
+        # building following Edwards et al. TEMPO2 (14)
+        n0 = - self.src.wz
+        
+        aL = [
+                -np.sin(self.src.param['RAS']),
+                np.cos(self.src.param['DEC']),
+                0.
+            ]
+        
+        dL = [
+                -np.cos(self.src.param['RAS'])*np.sin(self.src.param['DEC']),
+                -np.sin(self.src.param['RAS'])*np.sin(self.src.param['DEC']),
+                np.cos(self.src.param['DEC'])
+            ]
+
+        a = pd.Series(aL, index=coords)
+        d = pd.Series(dL, index=coords)
+
+       
+        mu_perp = self.src.param['PMRAS']*a + self.src.param['PMDEC']*d
+        
+        dt = pd.Series(self.obs.t - self.src.param['POSEPOCH'], index=self.obs.t)
+        
+        speed_term = pd.DataFrame(np.outer(mu_perp, dt), index=coords, columns=self.obs.t)
+        
+        accel_term_A = - abs(mu_perp.dot(mu_perp))**2 * n0 /2. 
+        accel_term = pd.DataFrame(np.outer(accel_term_A, dt**2), index=coords, columns=self.obs.t)
+        
+        n = (speed_term + accel_term).add(n0, axis='index').T
+        
         
         # vector from SSB to geocenter
         if self.psr == 'J0534+2200':
@@ -304,7 +335,7 @@ class System(object):
         r = r_d + eph.r.T
         
         # dot product
-        rn = r.mul(n, axis='columns').sum(axis=1)
+        rn = (r*n).sum(axis=1)
         
         self.roemer = rn/c
 
@@ -395,7 +426,7 @@ class System(object):
     
 def fakedata(ndays, scale=10**-21, t0=630720013):
     t = np.arange(t0, t0 + ndays*sd.ss, 1000*sd.periodLIGO).astype(int)
-    d = [random.random()*scale + for i in t]
+    d = [random.random()*scale for x in t]
     data = pd.Series(d, index=t)
     return data
     
