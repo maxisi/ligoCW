@@ -38,7 +38,7 @@ for kind in injection_kinds:
 
     for p in pd:
     
-        ij = process.InjSearch(detector, crab, nf, kind, pd, ninj)
+        ij = process.InjSearch(detector, crab, nf, kind, p, ninj)
         
         ij.analyze(search_methods)
         
