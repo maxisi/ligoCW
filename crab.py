@@ -45,4 +45,4 @@ for kind in injection_kinds:
         ij.results.save(extra_name=range)
     
         for plot in plots:
-            ij.results.plots(crab, plot, extra_name='S5_range'+range)
+            ij.results.plots(crab, plot, extra_name='S5_range'+range[0])
