@@ -268,7 +268,7 @@ class Results(object):
         
         self.issaved =  False
         
-    def save(self):
+    def save(self, extra_name=''):
         
         self.h.index = self.hinj
         self.s.index = self.hinj
@@ -281,7 +281,7 @@ class Results(object):
             pass
             
         try:
-            f = pd.HDFStore(self.path, 'w')
+            f = pd.HDFStore(self.path + exta_name, 'w')
             f['h'] = self.h
             f['s'] = self.s
             f['stats']= self.stats
@@ -339,7 +339,7 @@ class Results(object):
 
 class InjSearch(object):
     
-    def __init__(self, detector, psr, nfreq, injkind, pdif, ninj, rangeparam=[], frange=[1.0e-7, 1.0e-5], hinjrange=[1.0E-27, 1.0E-24], filesize=100):
+    def __init__(self, detector, psr, nfreq, injkind, pdif, ninj, rangeparam=[], frange=[1.0e-7, 1.0e-5], hinjrange=[1.0E-27, 1.0E-23], filesize=100):
         # system info
         self.detector = detector
         self.psr = psr
@@ -353,7 +353,7 @@ class InjSearch(object):
         self.t = self.background.seed.finehet.index
         
         sigma = Sigma(self.detector, self.psr, self.background.seed.finehet)
-        self.sg = sigma.std
+        self.sg = 2 * sigma.std
         
         # injection info
         inj = np.linspace(hinjrange[0], hinjrange[1], ninj)
