@@ -285,7 +285,10 @@ class Results(object):
             f['h'] = self.h
             f['s'] = self.s
             f['stats']= self.stats
-        finally:
+        except:
+            print "Didn't save!"
+            print self.path + exta_name
+        else:
             f.close()
             
         self.issaved = True
