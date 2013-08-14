@@ -23,11 +23,8 @@ pd = [0.0, 'p', 'm']
 plots = ['hinjrec', 'hinjs', 'hinjlins']
 
 
-def crab(range='')
+def crab(range=''):
 
-    if range=='':
-        range = []
-        
     for kind in injection_kinds:
 
         for p in pd:
