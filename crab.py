@@ -4,7 +4,6 @@ print 'Loading modules...'
 
 import process
 import paths
-import sys
 
 
 paths.makestructure()
@@ -25,24 +24,21 @@ pd = [0.0, 'p', 'm']
 
 plots = ['hinjrec', 'hinjs', 'hinjlins']
 
-range = sys.argv
-del range[0]
 
-if 'all' in range:
-    range = 'all'
+def crab(range='')
 
-
-
-# PROCESS
-for kind in injection_kinds:
-
-    for p in pd:
-    
-        ij = process.InjSearch(detector, crab, nf, kind, p, ninj)
+    if range=='':
+        range = []
         
-        ij.analyze(search_methods)
-        
-        ij.results.save(extra_name=range)
+    for kind in injection_kinds:
+
+        for p in pd:
     
-        for plot in plots:
-            ij.results.plots(crab, plot, extra_name='S5_range'+range[0])
+            ij = process.InjSearch(detector, crab, nf, kind, p, ninj, rangeparam=[range])
+        
+            ij.analyze(search_methods)
+        
+            for plot in plots:
+                ij.results.plots(crab, plot, extra_name='S5_range'+range)
+            ij.results.save(extra_name=range)
+    
