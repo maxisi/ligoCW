@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 print 'Loading modules...'
 
 import process
