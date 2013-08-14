@@ -281,13 +281,13 @@ class Results(object):
             pass
             
         try:
-            f = pd.HDFStore(self.path + exta_name, 'w')
+            f = pd.HDFStore(self.path + extra_name, 'w')
             f['h'] = self.h
             f['s'] = self.s
             f['stats']= self.stats
         except:
             print "Didn't save!"
-            print self.path + exta_name
+            print self.path + extra_name
         else:
             f.close()
             
