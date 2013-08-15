@@ -134,8 +134,9 @@ class Data(object):
                 self.finehet = d[self.psr]
             except KeyError:
                 # file is empty or is corrupted
+                d.close()
                 self.imp()
-            finally:
+            else:
                 d.close()
         
         except IOError:
@@ -572,3 +573,35 @@ class Sigma(object):
         except IOError:
             os.makedirs(save_dir)
             plt.savefig(save_dir + save_name, bbox_inches='tight')
+            
+
+class ManyPulsars(object):
+    
+    def __init__(self, detector):
+        self.detector = detector
+        
+        self.dir = paths.originalData + '/data' + detector
+        
+    
+    def census(self, ratio):
+        
+        # get names of all PSRs in directory
+        pre = 'finehet_'
+        pst = '_' + self.detector
+    
+        fnames = os.listdir(self.dir)
+        
+        names = [f.strip(pre).strip(pst) for f in fnames]
+        
+        # select subset according to range
+        set_choice = ratio[0]
+        set_options = ratio[1]
+        
+        setlength = len(names)/int(set_options)
+        
+        self.psrlist = names[set_choice * setlength : (set_choice + 1) * setlength]
+        
+        remainder = len(names) - (set_choice + 1) * setlength
+        
+        if remainder<setlength:
+            self.psrlist += names[(set_choice + 1) * setlength:]

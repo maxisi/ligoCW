@@ -11,7 +11,7 @@ paths.makestructure()
 nf = 2000
 ninj = 100
 
-detector = 'H1'
+detname = 'H1'
 crab = 'J0534+2200'
 
 injection_kinds = ['GR', 'G4v']
@@ -29,7 +29,7 @@ def crab(range=''):
 
         for p in pd:
     
-            ij = process.InjSearch(detector, crab, nf, kind, p, ninj, rangeparam=[range])
+            ij = process.InjSearch(detname, crab, nf, kind, p, ninj, rangeparam=[range])
         
             ij.analyze(search_methods)
         

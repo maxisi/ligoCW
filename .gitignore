@@ -36,3 +36,4 @@ unused/
 *.png
 *.pyc
 *.hdf5
+tests/.DS_Store
