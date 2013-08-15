@@ -42,9 +42,9 @@ def min_det_h(d):
     # get max noise
     noise = noise_line(d)(1)
     # find max injection below that
-    det_injs = d[d>noise]
+    det_injs = d[d<noise]
     try:
-        return det_injs.index[np.argmin(det_injs)]
+        return det_injs.index[np.argmax(det_injs)]
     except ValueError:
         return 0
 

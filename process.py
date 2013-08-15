@@ -249,18 +249,7 @@ class Results(object):
         self.h = pd.DataFrame(columns = methods, index=range(len(hinj)))
         self.s = pd.DataFrame(columns = methods, index=range(len(hinj)))
         
-        # stats
-        statkinds = [
-                    'lin s slope',
-                    'lin s noise',
-                    'lin s inter',
-                    'h rec slope',
-                    'h rec noise',
-                    'h rec inter',
-                    'min inj det'
-                    ]
-                    
-        self.stats = pd.DataFrame(index=statkinds, columns = methods)
+        self.stats = pd.DataFrame(index=sd.statkinds, columns = methods)
         
         # saving
         self.dir = paths.results + self.detector + '/' + self.psr + '/' 
@@ -577,13 +566,12 @@ class Sigma(object):
 
 class ManyPulsars(object):
     
-    def __init__(self, detector):
+    def __init__(self, detector, methods=['GR', 'G4v', 'AP']):
         self.detector = detector
         
         self.dir = paths.originalData + '/data' + detector
         
-    
-    def census(self, ratio):
+        self.methods = methods
         
         # get names of all PSRs in directory
         pre = 'finehet_'
@@ -591,17 +579,82 @@ class ManyPulsars(object):
     
         fnames = os.listdir(self.dir)
         
-        names = [f.strip(pre).strip(pst) for f in fnames]
+        self.allpsrs = [f.strip(pre).strip(pst) for f in fnames]
+        
+        # book-keeping
+        self.hasresults = False
+        self.failed = []
+    
+    def census(self, ratio):
+        
+        names = self.allpsrs
+        
+        print 'There are %d PSRs on file.' % len(names)
         
         # select subset according to range
         set_choice = ratio[0]
         set_options = ratio[1]
         
+        print 'Choosing subset #%d out of %d subsets.' % (set_choice+1, set_options)
+       
         setlength = len(names)/int(set_options)
         
-        self.psrlist = names[set_choice * setlength : (set_choice + 1) * setlength]
+        if set_options > len(names): print 'Error: cannot have more sets than pulsars!'
+        if set_choice < 0 or type(set_choice)!=int: print 'Error: set number must be a positive integer!'
         
-        remainder = len(names) - (set_choice + 1) * setlength
+        i0 = set_choice * setlength
+        i1 = (set_choice + 1) * setlength
         
-        if remainder<setlength:
-            self.psrlist += names[(set_choice + 1) * setlength:]
+        if set_choice < set_options-1: 
+            self.psrlist = names[i0: i1]
+            
+        elif set_choice == set_options-1:       
+            self.psrlist = names[i0:]
+        else:
+            self.psrlist = names
+            
+    
+    def analyze(self, injkind, ratio, extra_name=''):
+        
+        # get PSR subset
+        self.census(ratio)
+        
+        # setup results
+        for m in self.methods:
+            setattr(self,'stats'+m, pd.DataFrame(columns=self.psrlist, index=pd.statkinds))
+        
+        # loop over PSRs
+        for psr in self.psrlist:
+            print 'Analyzing ' + psr
+            
+            try:
+                ij = InjSearch(self.detector, psr, 2000, injkind, 'p', 100, rangeparam='all', filesize=200)
+                
+                ij.analyze(self.methods)
+                
+                print 'Recording results.'
+                
+                for m in self.methods:
+                    name = 'stats' + m + '[' + psr + ']'
+                    setattr(self,name, ij.results.stats[m])
+            except:
+                print psr + ' search failed.'
+                self.failed += [psr]
+        
+        # save stats
+        self.save(extra_name=extra_name)
+        
+        
+    def save(self, extra_name=''):
+        now = str(datetime.datetime.now())
+        path = paths.results + 'manypsr_' + self.detector + '_' + now + '_' + extra_name
+        try:
+            f = pd.HDFStore(path, 'w')
+            
+            for m in self.methods:
+                f[m] = getattr(self, 'stats' + m )
+        except IOError:
+            print 'Error: cannot save stats, something wrong with directory.'
+            print path
+        else:
+            f.close()

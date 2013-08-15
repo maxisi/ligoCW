@@ -209,3 +209,15 @@ pltcolor = {
             }
             
 default_style = '+'
+
+
+# RESULTS
+statkinds = [
+            'lin s slope',
+            'lin s noise',
+            'lin s inter',
+            'h rec slope',
+            'h rec noise',
+            'h rec inter',
+            'min inj det'
+            ]
