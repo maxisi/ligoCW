@@ -91,28 +91,7 @@ class Data(object):
                 dParts
             except NameError:
                 print 'Could not find %s data for PSR %s in:\n' % (self.detector, self.psr),
-                for p in pathOptions:
-                    print '\t%(p)s' % locals()
-                    
-                print 'Should I...'
-                print '\t1. Provide path\n\t2. Abort'
-                opt = raw_input('>')
-            
-                if opt==1:
-            
-                    try:
-                        psrpath = raw_input('Enter path: ')
-                        dParts = pd.read_table(psrpath, sep='\s+', names= [None, 'Re', 'Im'], header=None, index_col=0)
-                
-                    except IOError:
-                        print "File not found. One more try?"
-                        psrpath = raw_input('Enter path: ')
-                        dParts = pd.read_table(psrpath, sep='\s+', names= [None, 'Re', 'Im'], header=None, index_col=0)
-            
-                else:
-                    print 'Could not find %(detector)s data for PSR %(psr)s.' % locals()
-                    print 'Exiting at analysis/process ln 77'
-                    exit()
+                raise IOError
 
             self.finehet = dParts['Re']+dParts['Im']*1j
             d[self.psr] = self.finehet
@@ -621,7 +600,7 @@ class ManyPulsars(object):
         
         # setup results
         for m in self.methods:
-            setattr(self,'stats'+m, pd.DataFrame(columns=self.psrlist, index=pd.statkinds))
+            setattr(self,'stats'+m, pd.DataFrame(columns=self.psrlist, index=sd.statkinds))
         
         # loop over PSRs
         for psr in self.psrlist:
@@ -638,6 +617,10 @@ class ManyPulsars(object):
                     name = 'stats' + m + '[' + psr + ']'
                     setattr(self,name, ij.results.stats[m])
             except:
+                # print error message
+                e = sys.exc_info()[0]
+                write_to_page( "<p>Error: %s</p>" % e )
+
                 print psr + ' search failed.'
                 self.failed += [psr]
         
@@ -654,7 +637,17 @@ class ManyPulsars(object):
             for m in self.methods:
                 f[m] = getattr(self, 'stats' + m )
         except IOError:
+            # print error message
+            e = sys.exc_info()[0]
+            write_to_page( "<p>Error: %s</p>" % e )
+
             print 'Error: cannot save stats, something wrong with directory.'
             print path
         else:
             f.close()
+            
+class MP10(ManyPulsars):
+    def __init__(self, detector, n, methods=['GR', 'G4v', 'AP']):
+        super(self, MP10).__init__(detector, methods=['GR', 'G4v', 'AP'])
+        self.analyze('GR', [n, 10], extra_name=str(n)+'-9')
+    
