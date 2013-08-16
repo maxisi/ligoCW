@@ -607,23 +607,23 @@ class ManyPulsars(object):
         for psr in self.psrlist:
             print 'Analyzing ' + psr
             
-#             try:
-            ij = InjSearch(self.detector, psr, 2000, injkind, 'p', 100, rangeparam='all', filesize=200)
+            try:
+                ij = InjSearch(self.detector, psr, 2000, injkind, 'p', 100, rangeparam='all', filesize=200)
             
-            ij.analyze(self.methods)
+                ij.analyze(self.methods)
             
-            print 'Recording results.'
+                print 'Recording results.'
             
-            for m in self.methods:
-                name = 'stats' + m + '[' + psr + ']'
-                setattr(self,name, ij.results.stats[m])
-#             except:
+                for m in self.methods:
+                    name = 'stats' + m + '[' + psr + ']'
+                    setattr(self,name, ij.results.stats[m])
+            except:
                 # print error message
-#                 e = sys.exc_info()[0]
-#                 print "<p>Error: %s</p>" % e
-# 
-#                 print psr + ' search failed.'
-#                 self.failed += [psr]
+                e = sys.exc_info()[0]
+                print "<p>Error: %s</p>" % e
+
+                print psr + ' search failed.'
+                self.failed += [psr]
         
         # save stats
         self.save(extra_name=extra_name)
