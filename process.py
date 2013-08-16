@@ -574,7 +574,7 @@ class ManyPulsars(object):
         set_choice = ratio[0]
         set_options = ratio[1]
         
-        print 'Choosing subset #%d out of %d subsets.' % (set_choice+1, set_options)
+        print 'Choosing subset # %f out of %f subsets.' % (set_choice+1, set_options)
        
         setlength = len(names)/int(set_options)
         
