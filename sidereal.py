@@ -71,18 +71,8 @@ paramNames = [
                 'RAS error',
                 'DEC',
                 'DEC error',
-                'PMRAS',
-                'PMRAS error',
-                'PMDEC',
-                'PMDEC error',
-                'POSEPOCH',
-                'F0',
-                'F0 error',
-                'F1',
-                'F1 error',
-                'F2',
-                'F2 error']
-                
+            ]                
+
 extraParamNames = [None, 'POL', 'POL error', 'INC', 'INC error']
 
 ###

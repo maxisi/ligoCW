@@ -71,8 +71,8 @@ class Source(object):
         psrs = [self.psr] + extrapsrs
         
         def atnfurl(psr_list):
-            pre = 'http://www.atnf.csiro.au/research/pulsar/psrcat/proc_form.php?version=1.47&JName=JName&RaJ=RaJ&DecJ=DecJ&PMRA=PMRA&PMDec=PMDec&PosEpoch=PosEpoch&F0=F0&F1=F1&F2=F2&startUserDefined=true&c1_val=&c2_val=&c3_val=&c4_val=&sort_attr=jname&sort_order=asc&condition=&'
-            post = '&ephemeris=short&coords_unit=raj%2Fdecj&radius=&coords_1=&coords_2=&style=Long+with+errors&no_value=*&nohead=nohead&fsize=3&x_axis=&x_scale=linear&y_axis=&y_scale=linear&state=query&table_bottom.x=64&table_bottom.y=24'
+            pre = 'http://www.atnf.csiro.au/research/pulsar/psrcat/proc_form.php?version=1.47&JName=JName&RaJ=RaJ&DecJ=DecJ&startUserDefined=true&c1_val=&c2_val=&c3_val=&c4_val=&sort_attr=jname&sort_order=asc&condition=&'
+            post = '&ephemeris=short&coords_unit=raj%2Fdecj&radius=&coords_1=&coords_2=&style=Long+with+errors&no_value=*&nohead=nohead&fsize=3&x_axis=&x_scale=linear&y_axis=&y_scale=linear&state=query&table_bottom.x=36&table_bottom.y=16'
             names= 'pulsar_names='
     
             for psr in psr_list:
@@ -106,22 +106,12 @@ class Source(object):
         formatRASe = lambda x: sd.hms_rad(0., 0., x)
         formatDEC  = lambda y: np.radians(sd.dms_deg(y))
         formatDECe = lambda x: np.radians(sd.dms_deg(0., 0., x))
-        
-        formatPM    = lambda x: sd.masyr_rads(x)
-        formatEPOCH = lambda x: sd.mjd_gps(x)
-        
+                
         psrcat['RAS'] = psrcat['RAS'].map(formatRAS)                    # hms -> rad
         psrcat['RAS error'] = psrcat['RAS error'].map(formatRASe)
         psrcat['DEC'] = psrcat['DEC'].map(formatDEC)                    # dms -> rad
         psrcat['DEC error'] = psrcat['DEC error'].map(formatDECe) 
-        
-        psrcat['PMRAS'] = psrcat['PMRAS'].map(formatPM)                 # mas/yr -> rad/s
-        psrcat['PMRAS error'] = psrcat['PMRAS error'].map(formatPM)
-        psrcat['PMDEC'] = psrcat['PMDEC'].map(formatPM)
-        psrcat['PMDEC error'] = psrcat['PMDEC error'].map(formatPM)
-        
-        psrcat['POSEPOCH'] = psrcat['POSEPOCH'].map(formatEPOCH)        # MJD -> GPS
-
+    
     
         #Check extra parameters
         extra = pd.read_table(paths.psrextra, sep=',', header=None, index_col=[0], names=sd.extraParamNames)
