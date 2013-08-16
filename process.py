@@ -640,7 +640,7 @@ class ManyPulsars(object):
         except IOError:
             # print error message
             e = sys.exc_info()[0]
-            write_to_page( "<p>Error: %s</p>" % e )
+            print "<p>Error: %s</p>" % e
 
             print 'Error: cannot save stats, something wrong with directory.'
             print path
