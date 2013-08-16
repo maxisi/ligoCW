@@ -648,7 +648,7 @@ class ManyPulsars(object):
             f.close()
             
 class MP10(ManyPulsars):
-    def __init__(self, n, methods=['GR', 'G4v', 'AP']):
+    def __init__(self, n, methods=['GR', 'G4v', 'Sid']):
         super(MP10, self).__init__('H1', methods=methods)
         self.analyze('GR', [n, 10], extra_name=str(n)+'-9')
     
