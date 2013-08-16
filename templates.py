@@ -549,7 +549,7 @@ class Signal(object):
             info['p']['br'] = p + pdif_s
             
         else:
-            print 'Warning: %s is not a recognized template (temp 544)'
+            print 'Warning: %s is not a recognized template (temp 544)' % self.kind
             exit()
             
         return info
