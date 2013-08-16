@@ -654,6 +654,6 @@ class MP10(ManyPulsars):
         
 class MP10b(ManyPulsars):
     def __init__(self, n, methods=['GR', 'G4v', 'Sid']):
-        super(MP10, self).__init__('H1', methods=methods)
+        super(MP10b, self).__init__('H1', methods=methods)
         self.analyze('G4v', [n, 10], extra_name=str(n)+'-9')
     
