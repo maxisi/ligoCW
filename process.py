@@ -765,5 +765,10 @@ class Crab(SinglePulsar):
     def __init__(self, paramrange='all', methods=['GR', 'G4v'], extra_name='S6'):
         super(Crab, self).__init__('H1', 'J0534+2200', methods=methods)
         self.scan(range=paramrange, hinjrange=[1.0E-27, 1.0E-24])
-        
-        
+
+      
+class Vela(SinglePulsar):
+    def __init__(self, paramrange='all', methods=['GR', 'G4v'], extra_name='S6'):
+        super(Vela, self).__init__('V1', 'J0835-4510', methods=methods)
+        self.scan(range=paramrange, hinjrange=[1.0E-27, 1.0E-24])
+      
