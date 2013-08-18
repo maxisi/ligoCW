@@ -208,6 +208,107 @@ class Background(object):
             self.create()
 
 
+class Sigma(object):
+    def __init__(self, detector, psr, data, justload=False):
+        self.detector = detector
+        self.psr = psr
+        
+        self.data =  data
+        
+        self.dir = paths.sigma + '/' + self.detector + '/'
+        self.name = 'segsigma_' + self.psr + '_' + self.detector
+        self.path = self.dir + self.name
+        
+        self.justload = justload
+        
+        self.get()
+        
+    def create(self):
+        '''
+        Splits data into day-long segments and returns their standard deviation.
+        '''
+        
+        data  = self.data
+        
+        # Check orientation    
+        t = data.index
+        interval_length= sd.ss
+        print 'Taking std over %f second-long intervals:' % interval_length,
+
+        # Slice up data into day-long bins and get groupby stats (see Ch 9 of Python for Data Analysis).
+        bins = np.arange(t[0]-interval_length, t[-1]+interval_length, interval_length)
+        slices = pd.cut(t, bins, right=False)
+        print 'sliced,',
+
+        def getsigma(group):
+    #         s = np.std(group)
+            g = np.array(group.tolist())
+            s = np.std(g)
+            return s
+            #return group.std(ddof=0) # this is pd unbiased 1/(n-1), should use np.std 1/n?
+        
+        print 'std taken,',
+        grouped = data.groupby(slices) # groups by bin
+        sigmagroups= grouped.apply(getsigma) # gets std for each bin
+        print 'grouped,',
+
+        # Create standard deviation time series 
+        s = [sigmagroups.ix[slices.labels[t_index]] for t_index in range(0,len(t)) ]
+        self.std = pd.Series(s, index=t)
+        print 'done.'
+    
+    
+    def get(self):
+        print 'Retrieving segment standard deviation...' % locals(),
+        try:
+            s = pd.HDFStore(self.path)
+            try:
+                self.std = s[self.psr]
+                
+                # check times coincide
+                if not self.justload:
+                    if not set(self.std.index)==set(self.data.index):
+                        self.create()
+                        # save
+                        s.close()
+                        s = pd.HDFStore(self.path, 'w')
+                        s[self.psr] = self.std
+                    
+            except KeyError:
+                print 'PSR not in file.',
+                self.create()
+                # save
+                s[self.psr] = self.std
+                
+        except IOError:
+            print 'Creating std directory.',
+            os.makedirs(self.dir)
+            self.create()
+            # save
+            s = pd.HDFStore(self.path, 'w')
+            s[self.psr] = self.std
+            
+        finally:
+            s.close()
+        
+        print 'Sigma is ready.'
+        
+    def plot(self, extra_name=''):
+        
+        self.std.plot(style='+')
+        plt.title('Daily standard deviation for ' + self.detector + ' ' + self.psr + ' data ' + extra_name)
+        plt.xlabel('GPS time (s)')
+        plt.ylabel('$\sigma$')
+        
+        # save
+        save_dir = paths.plots + '/' + self.detector + '/sigma/'
+        save_name = self.name + extra_name + '.png'
+        try:
+            plt.savefig(save_dir + save_name, bbox_inches='tight')
+        except IOError:
+            os.makedirs(save_dir)
+            plt.savefig(save_dir + save_name, bbox_inches='tight')
+
 
 class Results(object):
     '''
@@ -441,109 +542,6 @@ class InjSearch(object):
 
         ## Save
         self.results.save()
-
-
-## SEARCH
-class Sigma(object):
-    def __init__(self, detector, psr, data, justload=False):
-        self.detector = detector
-        self.psr = psr
-        
-        self.data =  data
-        
-        self.dir = paths.sigma + '/' + self.detector + '/'
-        self.name = 'segsigma_' + self.psr + '_' + self.detector
-        self.path = self.dir + self.name
-        
-        self.justload = justload
-        
-        self.get()
-        
-    def create(self):
-        '''
-        Splits data into day-long segments and returns their standard deviation.
-        '''
-        
-        data  = self.data
-        
-        # Check orientation    
-        t = data.index
-        interval_length= sd.ss
-        print 'Taking std over %f second-long intervals:' % interval_length,
-
-        # Slice up data into day-long bins and get groupby stats (see Ch 9 of Python for Data Analysis).
-        bins = np.arange(t[0]-interval_length, t[-1]+interval_length, interval_length)
-        slices = pd.cut(t, bins, right=False)
-        print 'sliced,',
-
-        def getsigma(group):
-    #         s = np.std(group)
-            g = np.array(group.tolist())
-            s = np.std(g)
-            return s
-            #return group.std(ddof=0) # this is pd unbiased 1/(n-1), should use np.std 1/n?
-        
-        print 'std taken,',
-        grouped = data.groupby(slices) # groups by bin
-        sigmagroups= grouped.apply(getsigma) # gets std for each bin
-        print 'grouped,',
-
-        # Create standard deviation time series 
-        s = [sigmagroups.ix[slices.labels[t_index]] for t_index in range(0,len(t)) ]
-        self.std = pd.Series(s, index=t)
-        print 'done.'
-    
-    
-    def get(self):
-        print 'Retrieving segment standard deviation...' % locals(),
-        try:
-            s = pd.HDFStore(self.path)
-            try:
-                self.std = s[self.psr]
-                
-                # check times coincide
-                if not self.justload:
-                    if not set(self.std.index)==set(self.data.index):
-                        self.create()
-                        # save
-                        s.close()
-                        s = pd.HDFStore(self.path, 'w')
-                        s[self.psr] = self.std
-                    
-            except KeyError:
-                print 'PSR not in file.',
-                self.create()
-                # save
-                s[self.psr] = self.std
-                
-        except IOError:
-            print 'Creating std directory.',
-            os.makedirs(self.dir)
-            self.create()
-            # save
-            s = pd.HDFStore(self.path, 'w')
-            s[self.psr] = self.std
-            
-        finally:
-            s.close()
-        
-        print 'Sigma is ready.'
-        
-    def plot(self, extra_name=''):
-        
-        self.std.plot(style='+')
-        plt.title('Daily standard deviation for ' + self.detector + ' ' + self.psr + ' data ' + extra_name)
-        plt.xlabel('GPS time (s)')
-        plt.ylabel('$\sigma$')
-        
-        # save
-        save_dir = paths.plots + '/' + self.detector + '/sigma/'
-        save_name = self.name + extra_name + '.png'
-        try:
-            plt.savefig(save_dir + save_name, bbox_inches='tight')
-        except IOError:
-            os.makedirs(save_dir)
-            plt.savefig(save_dir + save_name, bbox_inches='tight')
             
 
 ## MANY PULSAR ANALYSIS
@@ -651,15 +649,15 @@ class ManyPulsars(object):
             f.close()
     
             
-class MP10(ManyPulsars):
+class MP10gr(ManyPulsars):
     def __init__(self, n, methods=['GR', 'G4v', 'Sid']):
-        super(MP10, self).__init__('H1', methods=methods)
+        super(MP10gr, self).__init__('H1', methods=methods)
         self.analyze('GR', [n, 10], extra_name=str(n)+'-9')
     
         
-class MP10b(ManyPulsars):
+class MP10g4v(ManyPulsars):
     def __init__(self, n, methods=['GR', 'G4v', 'Sid']):
-        super(MP10b, self).__init__('H1', methods=methods)
+        super(MP10g4v, self).__init__('H1', methods=methods)
         self.analyze('G4v', [n, 10], extra_name=str(n)+'-9')
   
         
@@ -730,3 +728,42 @@ class MPstats(object):
                 
                 plt.savefig(path + k + '_inj' + self.injkind + self.pdif + '_srch' + m + '_' + self.detector, bbox_inches='tight')
                 plt.close()
+                
+                
+## SPECIAL CASES
+class SinglePulsar(object):
+    def __init__(self, detector, psr, pd=['p'], methods=['GR', 'G4v']):
+        self.detector = detector
+        self.psr = psr
+        
+        self.injection_kinds = ['GR', 'G4v']
+
+        self.search_methods = methods
+        
+        self.pd = pd
+
+        self.plots = ['hinjrec', 'hinjs', 'hinjlins']
+
+
+    def scan(self, range='', hinjrange=[1.0E-27, 1.0E-23], extra_name='S6'):
+
+        for kind in self.injection_kinds:
+
+            for p in self.pd:
+    
+                ij = InjSearch(self.detector, self.psr, 2000, kind, p, 100, hinjrange=hinjrange, rangeparam=[range])
+        
+                ij.analyze(self.search_methods)
+        
+                for pl in self.plots:
+                    ij.results.plots(pl, extra_name=extra_name + '_range'+range)
+                    
+                ij.results.save(extra_name=extra_name + '_range'+range)
+                
+                
+class Crab(SinglePulsar):
+    def __init__(self, paramrange='all', methods=['GR', 'G4v'], extra_name='S6'):
+        super(Crab, self).__init__('H1', 'J0534+2200', methods=methods)
+        self.scan(range=paramrange, hinjrange=[1.0E-27, 1.0E-24])
+        
+        
