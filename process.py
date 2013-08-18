@@ -92,6 +92,8 @@ class Data(object):
                 dParts
             except NameError:
                 print 'Could not find %s data for PSR %s in:\n' % (self.detector, self.psr),
+                print p
+
                 raise IOError
 
             self.finehet = dParts['Re']+dParts['Im']*1j
@@ -544,6 +546,7 @@ class Sigma(object):
             plt.savefig(save_dir + save_name, bbox_inches='tight')
             
 
+## MANY PULSAR ANALYSIS
 class ManyPulsars(object):
     
     def __init__(self, detector, methods=['GR', 'G4v', 'AP']):
@@ -646,14 +649,84 @@ class ManyPulsars(object):
             print path
         else:
             f.close()
+    
             
 class MP10(ManyPulsars):
     def __init__(self, n, methods=['GR', 'G4v', 'Sid']):
         super(MP10, self).__init__('H1', methods=methods)
         self.analyze('GR', [n, 10], extra_name=str(n)+'-9')
+    
         
 class MP10b(ManyPulsars):
     def __init__(self, n, methods=['GR', 'G4v', 'Sid']):
         super(MP10b, self).__init__('H1', methods=methods)
         self.analyze('G4v', [n, 10], extra_name=str(n)+'-9')
-    
+  
+        
+class MPstats(object):
+
+    def __init__(self, detector, load=True):
+        self.detector = detector
+        
+        self.path = 'files/analysis/results/atlas/' + detector + '/'
+        self.psrs = os.listdir(self.path)
+        self.psrs.remove('.DS_Store')
+        
+        self.failed = []
+        
+        self.statdict = {k : k.replace(' ', '_') for k in sd.statkinds}
+        
+        
+    def load(self, injkind, pdif='p', methods=['GR', 'G4v', 'Sid']):
+        
+        self.injkind = injkind
+        self.pdif = pdif
+        
+        for k in sd.statkinds:
+            setattr(self, self.statdict[k], pd.DataFrame(columns=methods, index=self.psrs))
+        
+        for psr in self.psrs:
+            path = self.path + '/' + psr + '/'
+            name = psr + '_' + self.detector + '_' + injkind + '_' + pdif
+            
+            try:
+                f = pd.HDFStore(path + name, 'r')
+                
+                stats = f['stats']
+
+                for k in sd.statkinds:
+                    stat_local = getattr(self, self.statdict[k])
+                    stat_local.ix[psr] = stats.ix[k]
+                
+            except IOError:
+                print 'No data for ' + psr
+                self.failed += [psr]
+            else:
+                f.close()
+
+    def hist(self, nbins=25, methods=['GR', 'G4v', 'Sid']):
+        
+        for k in self.statdict:
+            stat = getattr(self, self.statdict[k])
+            
+            for m in methods:
+                plt.figure()
+                # histogram
+                stat[m].hist(color=sd.pltcolor[m], bins=nbins, label=m)
+                
+                # format
+                plt.title(self.injkind + ' injection on ' + self.detector + ' data ' + k.replace('_', ' ') + ' for ' + str(len(self.psrs)-len(self.failed)) + ' PSRs')
+                plt.xlabel(sd.statlabels[k])
+                plt.ylabel('Count')
+                plt.legend(numpoints=1)
+                
+                # save
+                path = paths.plots + self.detector + '/manypulsars/' + k + '/'
+                
+                try:
+                    os.makedirs(path)
+                except:
+                    pass
+                
+                plt.savefig(path + k + '_inj' + self.injkind + self.pdif + '_srch' + m + '_' + self.detector, bbox_inches='tight')
+                plt.close()

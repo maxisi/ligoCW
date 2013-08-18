@@ -3,6 +3,8 @@ print 'Loading modules...'
 import process
 import paths
 
+reload(paths)
+reload(process)
 
 paths.makestructure()
 
@@ -12,7 +14,7 @@ nf = 2000
 ninj = 100
 
 detname = 'H1'
-crab = 'J0534+2200'
+psr = 'J0534+2200'
 
 injection_kinds = ['GR', 'G4v']
 
@@ -29,11 +31,11 @@ def crab(range=''):
 
         for p in pd:
     
-            ij = process.InjSearch(detname, crab, nf, kind, p, ninj, rangeparam=[range])
+            ij = process.InjSearch(detname, psr, nf, kind, p, ninj, rangeparam=[range])
         
             ij.analyze(search_methods)
         
             for plot in plots:
-                ij.results.plots(crab, plot, extra_name='S5_range'+range)
+                ij.results.plots(crab, plot, extra_name='S6_range'+range)
             ij.results.save(extra_name=range)
     

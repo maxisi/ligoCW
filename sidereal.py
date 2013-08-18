@@ -192,10 +192,10 @@ def phase2(pinj):
         
 # PLOTS
 pltcolor = {
-            'GR' : 'c',
-            'G4v': 'm',
-            'AP' : 'b',
-            'Sid': 'c'
+            'GR' : 'g',
+            'G4v': 'r',
+            'AP' : 'c',
+            'Sid': 'b'
             }
             
 default_style = '+'
@@ -211,3 +211,13 @@ statkinds = [
             'h rec inter',
             'min inj det'
             ]
+            
+statlabels = {
+            'lin s slope' : 'Lin. sig. fit slope',
+            'lin s noise' : 'Lin. sig. noise level',
+            'lin s inter' : 'Lin. sig. fit intersect noise level',
+            'h rec slope' : '$h_{rec}$ fit slope',
+            'h rec noise' : '$h_{rec}$ noise level',
+            'h rec inter' : '$h_{rec}$ fit intersect noise level',
+            'min inj det' : 'Strength of minimum detection'
+            }
